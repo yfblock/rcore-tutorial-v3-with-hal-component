@@ -1,24 +1,24 @@
+use super::TaskControlBlock;
 use super::__switch;
 use super::{fetch_task, TaskStatus};
-use super::{TaskContext, TaskControlBlock};
 use crate::sync::UPSafeCell;
-use crate::trap::TrapContext;
 use alloc::sync::Arc;
+use arch::TrapFrame;
 use lazy_static::*;
 
 pub struct Processor {
     current: Option<Arc<TaskControlBlock>>,
-    idle_task_cx: TaskContext,
+    idle_task_cx: TrapFrame,
 }
 
 impl Processor {
     pub fn new() -> Self {
         Self {
             current: None,
-            idle_task_cx: TaskContext::zero_init(),
+            idle_task_cx: TrapFrame::new(),
         }
     }
-    fn get_idle_task_cx_ptr(&mut self) -> *mut TaskContext {
+    fn get_idle_task_cx_ptr(&mut self) -> *mut TrapFrame {
         &mut self.idle_task_cx as *mut _
     }
     pub fn take_current(&mut self) -> Option<Arc<TaskControlBlock>> {
@@ -40,7 +40,7 @@ pub fn run_tasks() {
             let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
             // access coming task TCB exclusively
             let mut task_inner = task.inner_exclusive_access();
-            let next_task_cx_ptr = &task_inner.task_cx as *const TaskContext;
+            let next_task_cx_ptr = &task_inner.task_cx as *const TrapFrame;
             task_inner.task_status = TaskStatus::Running;
             drop(task_inner);
             // release coming task TCB manually
@@ -68,14 +68,7 @@ pub fn current_user_token() -> usize {
     token
 }
 
-pub fn current_trap_cx() -> &'static mut TrapContext {
-    current_task()
-        .unwrap()
-        .inner_exclusive_access()
-        .get_trap_cx()
-}
-
-pub fn schedule(switched_task_cx_ptr: *mut TaskContext) {
+pub fn schedule(switched_task_cx_ptr: *mut TrapFrame) {
     let mut processor = PROCESSOR.exclusive_access();
     let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
     drop(processor);

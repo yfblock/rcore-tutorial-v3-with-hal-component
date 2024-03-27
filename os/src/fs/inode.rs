@@ -7,6 +7,7 @@ use alloc::vec::Vec;
 use bitflags::*;
 use easy_fs::{EasyFileSystem, Inode};
 use lazy_static::*;
+use log::info;
 
 pub struct OSInode {
     readable: bool,
@@ -46,6 +47,7 @@ impl OSInode {
 lazy_static! {
     pub static ref ROOT_INODE: Arc<Inode> = {
         let efs = EasyFileSystem::open(BLOCK_DEVICE.clone());
+        info!("ebd");
         Arc::new(EasyFileSystem::root_inode(&efs))
     };
 }

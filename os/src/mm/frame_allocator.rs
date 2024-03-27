@@ -2,6 +2,7 @@ use super::{PhysAddr, PhysPageNum};
 use crate::config::MEMORY_END;
 use crate::sync::UPSafeCell;
 use alloc::vec::Vec;
+use arch::PAGE_SIZE;
 use core::fmt::{self, Debug, Formatter};
 use lazy_static::*;
 
@@ -87,14 +88,17 @@ lazy_static! {
         unsafe { UPSafeCell::new(FrameAllocatorImpl::new()) };
 }
 
-pub fn init_frame_allocator() {
+pub fn init_frame_allocator(mm_start: usize, mm_end: usize) {
     extern "C" {
-        fn ekernel();
+        fn end();
     }
-    FRAME_ALLOCATOR.exclusive_access().init(
-        PhysAddr::from(ekernel as usize).ceil(),
-        PhysAddr::from(MEMORY_END).floor(),
-    );
+    let phys_end = end as usize;
+    if phys_end >= mm_start && phys_end < mm_end {
+        FRAME_ALLOCATOR.exclusive_access().init(
+            PhysAddr::from((phys_end + 0xfff) / PAGE_SIZE * PAGE_SIZE).ceil(),
+            PhysAddr::from(MEMORY_END).floor(),
+        );
+    }
 }
 
 pub fn frame_alloc() -> Option<FrameTracker> {

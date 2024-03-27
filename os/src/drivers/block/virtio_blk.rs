@@ -1,10 +1,8 @@
 use super::BlockDevice;
-use crate::mm::{
-    frame_alloc, frame_dealloc, kernel_token, FrameTracker, PageTable, PhysAddr, PhysPageNum,
-    StepByOne, VirtAddr,
-};
+use crate::mm::{frame_alloc, frame_dealloc, FrameTracker, PhysAddr, PhysPageNum, StepByOne};
 use crate::sync::UPSafeCell;
 use alloc::vec::Vec;
+use arch::VIRT_ADDR_START;
 use lazy_static::*;
 use virtio_drivers::{Hal, VirtIOBlk, VirtIOHeader};
 
@@ -37,7 +35,10 @@ impl VirtIOBlock {
     pub fn new() -> Self {
         unsafe {
             Self(UPSafeCell::new(
-                VirtIOBlk::<VirtioHal>::new(&mut *(VIRTIO0 as *mut VirtIOHeader)).unwrap(),
+                VirtIOBlk::<VirtioHal>::new(
+                    &mut *((VIRTIO0 | VIRT_ADDR_START) as *mut VirtIOHeader),
+                )
+                .unwrap(),
             ))
         }
     }
@@ -75,9 +76,10 @@ impl Hal for VirtioHal {
     }
 
     fn virt_to_phys(vaddr: usize) -> usize {
-        PageTable::from_token(kernel_token())
-            .translate_va(VirtAddr::from(vaddr))
-            .unwrap()
-            .0
+        vaddr
+        // PageTable::from_token(kernel_token())
+        //     .translate_va(VirtAddr::from(vaddr))
+        //     .unwrap()
+        //     .0
     }
 }

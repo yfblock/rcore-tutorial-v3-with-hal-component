@@ -1,5 +1,4 @@
 mod action;
-mod context;
 mod manager;
 mod pid;
 mod processor;
@@ -11,7 +10,7 @@ mod task;
 use crate::fs::{open_file, OpenFlags};
 use crate::sbi::shutdown;
 use alloc::sync::Arc;
-pub use context::TaskContext;
+use arch::TrapFrame;
 use lazy_static::*;
 use manager::fetch_task;
 use manager::remove_from_pid2task;
@@ -21,9 +20,7 @@ use task::{TaskControlBlock, TaskStatus};
 pub use action::{SignalAction, SignalActions};
 pub use manager::{add_task, pid2task};
 pub use pid::{pid_alloc, KernelStack, PidHandle};
-pub use processor::{
-    current_task, current_trap_cx, current_user_token, run_tasks, schedule, take_current_task,
-};
+pub use processor::{current_task, current_user_token, run_tasks, schedule, take_current_task};
 pub use signal::{SignalFlags, MAX_SIG};
 
 pub fn suspend_current_and_run_next() {
@@ -32,7 +29,7 @@ pub fn suspend_current_and_run_next() {
 
     // ---- access current TCB exclusively
     let mut task_inner = task.inner_exclusive_access();
-    let task_cx_ptr = &mut task_inner.task_cx as *mut TaskContext;
+    let task_cx_ptr = &mut task_inner.task_cx as *mut TrapFrame;
     // Change status to Ready
     task_inner.task_status = TaskStatus::Ready;
     drop(task_inner);
@@ -97,7 +94,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     // drop task manually to maintain rc correctly
     drop(task);
     // we do not have to save task context
-    let mut _unused = TaskContext::zero_init();
+    let mut _unused = TrapFrame::new();
     schedule(&mut _unused as *mut _);
 }
 

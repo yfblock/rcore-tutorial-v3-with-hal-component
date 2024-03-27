@@ -1,14 +1,14 @@
+use super::SignalActions;
 use super::{pid_alloc, KernelStack, PidHandle, SignalFlags};
-use super::{SignalActions, TaskContext};
 use crate::config::TRAP_CONTEXT;
 use crate::fs::{File, Stdin, Stdout};
-use crate::mm::{translated_refmut, MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
+use crate::mm::{translated_refmut, MemorySet, PhysPageNum, VirtAddr};
 use crate::sync::UPSafeCell;
-use crate::trap::{trap_handler, TrapContext};
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
+use arch::TrapFrame;
 use core::cell::RefMut;
 
 pub struct TaskControlBlock {
@@ -22,7 +22,7 @@ pub struct TaskControlBlock {
 pub struct TaskControlBlockInner {
     pub trap_cx_ppn: PhysPageNum,
     pub base_size: usize,
-    pub task_cx: TaskContext,
+    pub task_cx: TrapFrame,
     pub task_status: TaskStatus,
     pub memory_set: MemorySet,
     pub parent: Option<Weak<TaskControlBlock>>,
@@ -39,11 +39,11 @@ pub struct TaskControlBlockInner {
     pub killed: bool,
     // if the task is frozen by a signal
     pub frozen: bool,
-    pub trap_ctx_backup: Option<TrapContext>,
+    pub trap_ctx_backup: Option<TrapFrame>,
 }
 
 impl TaskControlBlockInner {
-    pub fn get_trap_cx(&self) -> &'static mut TrapContext {
+    pub fn get_trap_cx(&self) -> &'static mut TrapFrame {
         self.trap_cx_ppn.get_mut()
     }
     pub fn get_user_token(&self) -> usize {
@@ -87,7 +87,7 @@ impl TaskControlBlock {
                 UPSafeCell::new(TaskControlBlockInner {
                     trap_cx_ppn,
                     base_size: user_sp,
-                    task_cx: TaskContext::goto_trap_return(kernel_stack_top),
+                    task_cx: TrapFrame::goto_trap_return(kernel_stack_top),
                     task_status: TaskStatus::Ready,
                     memory_set,
                     parent: None,
@@ -113,13 +113,7 @@ impl TaskControlBlock {
         };
         // prepare TrapContext in user space
         let trap_cx = task_control_block.inner_exclusive_access().get_trap_cx();
-        *trap_cx = TrapContext::app_init_context(
-            entry_point,
-            user_sp,
-            KERNEL_SPACE.exclusive_access().token(),
-            kernel_stack_top,
-            trap_handler as usize,
-        );
+        *trap_cx = TrapFrame::app_init_context(entry_point, user_sp, kernel_stack_top);
         task_control_block
     }
     pub fn exec(&self, elf_data: &[u8], args: Vec<String>) {
@@ -161,13 +155,8 @@ impl TaskControlBlock {
         // update trap_cx ppn
         inner.trap_cx_ppn = trap_cx_ppn;
         // initialize trap_cx
-        let mut trap_cx = TrapContext::app_init_context(
-            entry_point,
-            user_sp,
-            KERNEL_SPACE.exclusive_access().token(),
-            self.kernel_stack.get_top(),
-            trap_handler as usize,
-        );
+        let mut trap_cx =
+            TrapFrame::app_init_context(entry_point, user_sp, self.kernel_stack.get_top());
         trap_cx.x[10] = args.len();
         trap_cx.x[11] = argv_base;
         *inner.get_trap_cx() = trap_cx;
@@ -202,7 +191,7 @@ impl TaskControlBlock {
                 UPSafeCell::new(TaskControlBlockInner {
                     trap_cx_ppn,
                     base_size: parent_inner.base_size,
-                    task_cx: TaskContext::goto_trap_return(kernel_stack_top),
+                    task_cx: TrapFrame::goto_trap_return(kernel_stack_top),
                     task_status: TaskStatus::Ready,
                     memory_set,
                     parent: Some(Arc::downgrade(self)),

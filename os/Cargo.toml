@@ -16,6 +16,15 @@ virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "4e
 easy-fs = { path = "../easy-fs" }
 log = "0.4"
 sbi-rt = { version = "0.0.2", features = ["legacy"] }
+crate_interface = { git = "https://github.com/Byte-OS/crate_interface.git" }
+arch = { path = "arch", features = ["kcontext"]}
+fdt = "0.1.5"
 
 [profile.release]
 debug = true
+
+[workspace]
+members = [
+    ".",
+    "arch"
+]
