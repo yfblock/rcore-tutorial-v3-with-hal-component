@@ -16,6 +16,7 @@ pub struct RamDiskBlock {
 
 impl BlockDevice for RamDiskBlock {
     fn read_block(&self, sector_offset: usize, buf: &mut [u8]) {
+        assert!(buf.len() == 0x200, "block size is not 0x200");
         let rlen = buf.len();
         if (sector_offset * 0x200 + rlen) >= self.size {
             panic!("can't out of ramdisk range")
@@ -26,8 +27,6 @@ impl BlockDevice for RamDiskBlock {
                     .as_ref()
                     .expect("can't deref ptr in the Ramdisk"),
             );
-            // let source = (self.start as *mut [u8; 512]).add(sector_offset);
-            // buf.copy_from_slice(source.as_mut().unwrap());
         }
     }
 
@@ -57,19 +56,36 @@ impl RamDiskBlock {
             "ramdisk range: {:#x} - {:#x}",
             ramdisk_start as usize, ramdisk_end as usize
         );
+        let start = ramdisk_start as _;
+        let size = ramdisk_end as usize - ramdisk_start as usize;
+        assert_ne!(size, 0, "ramdisk size is 0");
         Self {
-            start: ramdisk_start as _,
-            size: ramdisk_end as usize - ramdisk_start as usize,
+            start,
+            size,
         }
     }
 }
 
+#[cfg(target_arch = "loongarch64")]
 global_asm!(
     "
     .section .data
     .global ramdisk_start
     .global ramdisk_end
     .align 16
+    ramdisk_start:
+    .incbin \"./fs-img.img\"
+    ramdisk_end:
+"
+);
+
+#[cfg(target_arch = "x86_64")]
+global_asm!(
+    "
+    .section .data
+    .global ramdisk_start
+    .global ramdisk_end
+    .align 0x200
     ramdisk_start:
     .incbin \"./fs-img.img\"
     ramdisk_end:

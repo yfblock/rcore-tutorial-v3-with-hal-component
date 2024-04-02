@@ -11,7 +11,6 @@ use alloc::vec::Vec;
 use arch::{
     read_current_tp, run_user_task, KContext, KContextArgs, PageTable, TrapFrame, TrapFrameArgs,
 };
-use log::info;
 use core::cell::RefMut;
 use core::mem::size_of;
 
@@ -97,7 +96,6 @@ fn task_entry() {
         .get_trap_cx() as *mut TrapFrame;
     // run_user_task_forever(unsafe { task.as_mut().unwrap() })
     let ctx_mut = unsafe { task.as_mut().unwrap() };
-    info!("entry new task entry: {:#x?}", ctx_mut);
     loop {
         run_user_task(ctx_mut);
     }

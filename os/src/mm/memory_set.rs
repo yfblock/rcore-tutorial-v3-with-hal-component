@@ -6,7 +6,6 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use arch::pagetable::{MappingFlags, PageTableWrapper};
 use arch::{PageTable, PhysPage, VirtAddr, VirtPage};
-use log::info;
 
 pub struct MemorySet {
     page_table: Arc<PageTableWrapper>,
@@ -37,7 +36,6 @@ impl MemorySet {
         // map trampoline
         // map program headers of elf, with U flag
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
-        log::error!("entry point: {:#x}", elf.header.pt2.entry_point());
         let elf_header = elf.header;
         let magic = elf_header.pt1.magic;
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
@@ -177,8 +175,6 @@ impl MapArea {
             let src = &data[start..len.min(start + PAGE_SIZE)];
             let dst = &mut PhysPage::from(page_table.translate(current_vpn.into()).unwrap().0)
                 .get_buffer()[..src.len()];
-            info!("src: {:p}", src.as_ptr());
-            info!("copy {:?} @ {:p}", current_vpn, dst.as_ptr());
             dst.copy_from_slice(src);
             start += PAGE_SIZE;
             if start >= len {

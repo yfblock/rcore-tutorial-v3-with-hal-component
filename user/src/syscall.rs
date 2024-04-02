@@ -55,7 +55,13 @@ fn syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret: isize;
     unsafe {
         asm!(
-            "syscall",
+            "
+                push r11
+                push rcx
+                syscall
+                pop  rcx
+                pop  r11
+            ",
             in("rdi") args[0],
             in("rsi") args[1],
             in("rdx") args[2],

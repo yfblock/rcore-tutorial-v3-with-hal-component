@@ -32,8 +32,8 @@ MODE := release
 KERNEL_ELF := target/$(TARGET)/$(MODE)/os
 KERNEL_BIN := $(KERNEL_ELF).bin
 DISASM_TMP := target/$(TARGET)/$(MODE)/asm
-# FS_IMG := ../user/target/$(TARGET)/$(MODE)/fs.img
-FS_IMG := fs-img.img
+FS_IMG := ../user/target/$(TARGET)/$(MODE)/fs.img
+# FS_IMG := fs-img.img
 APPS := ../user/src/bin/*
 
 # BOARD
@@ -71,16 +71,16 @@ $(KERNEL_BIN): kernel
 	@$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $@
 
 fs-img: $(APPS)
-#	@cd ../user && make build TARGET=$(TARGET) TEST=$(TEST)
-#	@rm -f $(FS_IMG)
-#	@cd ../easy-fs-fuse && cargo run --release -- -s ../user/src/bin/ -t ../user/target/$(TARGET)/release/
+	@cd ../user && make build TARGET=$(TARGET) TEST=$(TEST)
+	@rm -f $(FS_IMG)
+	@cd ../easy-fs-fuse && cargo run --release -- -s ../user/src/bin/ -t ../user/target/$(TARGET)/release/
 	cp ../user/target/$(TARGET)/$(MODE)/fs.img fs-img.img
 
 $(APPS):
 
 kernel:
 	@echo Platform: $(BOARD)
-	@cargo build -Z build-std --release
+	@cargo build -Z build-std --release --target $(TARGET)
 
 clean:
 	@cargo clean
@@ -114,7 +114,7 @@ run-inner: build
 debug: build
 	@tmux new-session -d \
 		"$(QEMU_EXEC) -s -S" && \
-		tmux split-window -h "aarch64-linux-gnu-gdb -ex 'file $(KERNEL_ELF)' -ex 'target remote localhost:1234'" && \
+		tmux split-window -h "gdb -ex 'file $(KERNEL_ELF)' -ex 'target remote localhost:1234'" && \
 		tmux -2 attach-session -d
 
 
@@ -122,6 +122,6 @@ gdbserver: build
 	@$(QEMU_EXEC) -s -S
 
 gdbclient:
-	@riscv64-unknown-elf-gdb -ex 'file $(KERNEL_ELF)' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'
+	@gdb -ex 'file $(KERNEL_ELF)' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'
 
 .PHONY: build env kernel clean disasm disasm-vim run-inner fs-img gdbserver gdbclient
