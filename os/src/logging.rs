@@ -72,7 +72,3 @@ pub fn puts(buffer: &[u8]) {
         console_putchar(*i);
     }
 }
-
-pub fn get_char() -> Option<u8> {
-    console_getchar()
-}

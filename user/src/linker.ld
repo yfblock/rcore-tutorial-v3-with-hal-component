@@ -7,21 +7,22 @@ BASE_ADDRESS = 0x10000;
 SECTIONS
 {
     . = BASE_ADDRESS;
-    .text : {
+    .text ALIGN(4K): {
         *(.text.entry)
         *(.text .text.*)
     }
     . = ALIGN(4K);
-    .rodata : {
+    .rodata ALIGN(4K): {
         *(.rodata .rodata.*)
         *(.srodata .srodata.*)
     }
     . = ALIGN(4K);
-    .data : {
+    .data ALIGN(4K): {
         *(.data .data.*)
         *(.sdata .sdata.*)
     }
-    .bss : {
+    . = ALIGN(4K);
+    .bss ALIGN(4K): {
         *(.bss .bss.*)
         *(.sbss .sbss.*)
     }

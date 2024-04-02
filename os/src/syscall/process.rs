@@ -4,10 +4,11 @@ use crate::task::{
     add_task, current_task, current_user_token, exit_current_and_run_next, pid2task,
     suspend_current_and_run_next, SignalAction, SignalFlags, MAX_SIG,
 };
-use crate::timer::get_time_ms;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use arch::{get_time, time_to_usec, TrapFrameArgs};
+use log::info;
 
 pub fn sys_exit(exit_code: i32) -> ! {
     exit_current_and_run_next(exit_code);
@@ -20,7 +21,9 @@ pub fn sys_yield() -> isize {
 }
 
 pub fn sys_get_time() -> isize {
-    get_time_ms() as isize
+    // get_time_ms() as isize
+    // time_to_sec(get_time())
+    (time_to_usec(get_time()) * 1000) as isize
 }
 
 pub fn sys_getpid() -> isize {
@@ -35,7 +38,8 @@ pub fn sys_fork() -> isize {
     let trap_cx = new_task.inner_exclusive_access().get_trap_cx();
     // we do not have to move to next instruction since we have done it before
     // for child process, fork returns 0
-    trap_cx.x[10] = 0;
+    // trap_cx.x[10] = 0;
+    trap_cx[TrapFrameArgs::RET] = 0;
     // add new task to scheduler
     add_task(new_task);
     new_pid as isize
@@ -43,6 +47,7 @@ pub fn sys_fork() -> isize {
 
 pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
     let token = current_user_token();
+    // log::info!("path: {:p} token: {:#x} kernel token: {:#x}", path, current_user_token(), kernel_page_table_token());
     let path = translated_str(token, path);
     let mut args_vec: Vec<String> = Vec::new();
     loop {
@@ -143,11 +148,11 @@ pub fn sys_sigreturn() -> isize {
         inner.handling_sig = -1;
         // restore the trap context
         let trap_ctx = inner.get_trap_cx();
-        *trap_ctx = inner.trap_ctx_backup.unwrap();
+        *trap_ctx = inner.trap_ctx_backup.clone().unwrap();
         // Here we return the value of a0 in the trap_ctx,
         // otherwise it will be overwritten after we trap
         // back to the original execution of the application.
-        trap_ctx.x[10] as isize
+        trap_ctx[TrapFrameArgs::RET] as isize
     } else {
         -1
     }

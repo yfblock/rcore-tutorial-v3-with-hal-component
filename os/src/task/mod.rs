@@ -3,23 +3,23 @@ mod manager;
 mod pid;
 mod processor;
 mod signal;
-mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
 use crate::fs::{open_file, OpenFlags};
-use crate::sbi::shutdown;
 use alloc::sync::Arc;
-use arch::TrapFrame;
+use arch::shutdown;
+use arch::KContext;
+use arch::TrapFrameArgs;
 use lazy_static::*;
+use log::info;
 use manager::fetch_task;
 use manager::remove_from_pid2task;
-use switch::__switch;
 use task::{TaskControlBlock, TaskStatus};
 
 pub use action::{SignalAction, SignalActions};
 pub use manager::{add_task, pid2task};
-pub use pid::{pid_alloc, KernelStack, PidHandle};
+pub use pid::{pid_alloc, PidHandle};
 pub use processor::{current_task, current_user_token, run_tasks, schedule, take_current_task};
 pub use signal::{SignalFlags, MAX_SIG};
 
@@ -29,7 +29,7 @@ pub fn suspend_current_and_run_next() {
 
     // ---- access current TCB exclusively
     let mut task_inner = task.inner_exclusive_access();
-    let task_cx_ptr = &mut task_inner.task_cx as *mut TrapFrame;
+    let task_cx_ptr = &mut task_inner.task_cx as *mut KContext;
     // Change status to Ready
     task_inner.task_status = TaskStatus::Ready;
     drop(task_inner);
@@ -57,10 +57,10 @@ pub fn exit_current_and_run_next(exit_code: i32) {
         );
         if exit_code != 0 {
             //crate::sbi::shutdown(255); //255 == -1 for err hint
-            shutdown(true)
+            shutdown()
         } else {
             //crate::sbi::shutdown(0); //0 for success hint
-            shutdown(false)
+            shutdown()
         }
     }
 
@@ -94,13 +94,13 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     // drop task manually to maintain rc correctly
     drop(task);
     // we do not have to save task context
-    let mut _unused = TrapFrame::new();
+    let mut _unused = KContext::blank();
     schedule(&mut _unused as *mut _);
 }
 
 lazy_static! {
     pub static ref INITPROC: Arc<TaskControlBlock> = Arc::new({
-        let inode = open_file("initproc", OpenFlags::RDONLY).unwrap();
+        let inode = open_file("forktest_simple", OpenFlags::RDONLY).unwrap();
         let v = inode.read_all();
         TaskControlBlock::new(v.as_slice())
     });
@@ -168,14 +168,16 @@ fn call_user_signal_handler(sig: usize, signal: SignalFlags) {
 
         // backup trapframe
         let trap_ctx = task_inner.get_trap_cx();
-        task_inner.trap_ctx_backup = Some(*trap_ctx);
+        task_inner.trap_ctx_backup = Some(trap_ctx.clone());
 
         // modify trapframe
-        trap_ctx.sepc = handler;
+        trap_ctx[TrapFrameArgs::SEPC] = handler;
 
         // put args (a0)
-        trap_ctx.x[10] = sig;
+        trap_ctx[TrapFrameArgs::ARG0] = sig;
     } else {
+        info!("task id: {}", task.getpid());
+        info!("{:#x?}", task_inner.get_trap_cx());
         // default action
         println!("[K] task/call_user_signal_handler: default action: ignore it or kill process");
     }

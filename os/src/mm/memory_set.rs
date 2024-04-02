@@ -1,73 +1,34 @@
+use super::vpn_range::VPNRange;
 use super::{frame_alloc, FrameTracker};
-use super::{PTEFlags, PageTable, PageTableEntry};
-use super::{PhysPageNum, VirtAddr, VirtPageNum};
-use super::{StepByOne, VPNRange};
-use crate::config::{PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT, USER_STACK_SIZE};
-use crate::sync::UPSafeCell;
+use crate::config::{PAGE_SIZE, USER_STACK_SIZE};
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::arch::asm;
-use lazy_static::*;
-use riscv::register::satp;
-
-lazy_static! {
-    pub static ref KERNEL_SPACE: Arc<UPSafeCell<MemorySet>> =
-        Arc::new(unsafe { UPSafeCell::new(MemorySet::new_kernel()) });
-}
-
-pub fn kernel_token() -> usize {
-    KERNEL_SPACE.exclusive_access().token()
-}
+use arch::pagetable::{MappingFlags, PageTableWrapper};
+use arch::{PageTable, PhysPage, VirtAddr, VirtPage};
+use log::info;
 
 pub struct MemorySet {
-    page_table: PageTable,
+    page_table: Arc<PageTableWrapper>,
     areas: Vec<MapArea>,
 }
 
 impl MemorySet {
     pub fn new_bare() -> Self {
         Self {
-            page_table: PageTable::new(),
+            page_table: Arc::new(PageTableWrapper::alloc()),
             areas: Vec::new(),
         }
     }
-    pub fn token(&self) -> usize {
-        self.page_table.token()
-    }
-    /// Assume that no conflicts.
-    pub fn insert_framed_area(
-        &mut self,
-        start_va: VirtAddr,
-        end_va: VirtAddr,
-        permission: MapPermission,
-    ) {
-        self.push(
-            MapArea::new(start_va, end_va, MapType::Framed, permission),
-            None,
-        );
-    }
-    pub fn remove_area_with_start_vpn(&mut self, start_vpn: VirtPageNum) {
-        if let Some((idx, area)) = self
-            .areas
-            .iter_mut()
-            .enumerate()
-            .find(|(_, area)| area.vpn_range.get_start() == start_vpn)
-        {
-            area.unmap(&mut self.page_table);
-            self.areas.remove(idx);
-        }
+    pub fn token(&self) -> PageTable {
+        self.page_table.0
     }
     fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
-        map_area.map(&mut self.page_table);
+        map_area.map(&self.page_table);
         if let Some(data) = data {
-            map_area.copy_data(&mut self.page_table, data);
+            map_area.copy_data(&self.page_table, data);
         }
         self.areas.push(map_area);
-    }
-    /// Without kernel stacks.
-    pub fn new_kernel() -> Self {
-        Self::new_bare()
     }
     /// Include sections in elf and trampoline and TrapContext and user stack,
     /// also returns user_sp and entry point.
@@ -76,11 +37,12 @@ impl MemorySet {
         // map trampoline
         // map program headers of elf, with U flag
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
+        log::error!("entry point: {:#x}", elf.header.pt2.entry_point());
         let elf_header = elf.header;
         let magic = elf_header.pt1.magic;
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
         let ph_count = elf_header.pt2.ph_count();
-        let mut max_end_vpn = VirtPageNum(0);
+        let mut max_end_vpn = VirtPage::new(0);
         for i in 0..ph_count {
             let ph = elf.program_header(i).unwrap();
             if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
@@ -121,15 +83,6 @@ impl MemorySet {
             None,
         );
         // map TrapContext
-        memory_set.push(
-            MapArea::new(
-                TRAP_CONTEXT.into(),
-                TRAMPOLINE.into(),
-                MapType::Framed,
-                MapPermission::R | MapPermission::W,
-            ),
-            None,
-        );
         (
             memory_set,
             user_stack_top,
@@ -138,30 +91,35 @@ impl MemorySet {
     }
     pub fn from_existed_user(user_space: &MemorySet) -> MemorySet {
         let mut memory_set = Self::new_bare();
+        // let pt = Arc::new(PageTableWrapper::alloc());
+        // info!("pt");
+        // let mut memory_set = MemorySet {
+        //     page_table: pt,
+        //     areas: Vec::new(),
+        // };
         // copy data sections/trap_context/user_stack
         for area in user_space.areas.iter() {
             let new_area = MapArea::from_another(area);
             memory_set.push(new_area, None);
             // copy data from another space
             for vpn in area.vpn_range {
-                let src_ppn = user_space.translate(vpn).unwrap().ppn();
-                let dst_ppn = memory_set.translate(vpn).unwrap().ppn();
-                dst_ppn
-                    .get_bytes_array()
-                    .copy_from_slice(src_ppn.get_bytes_array());
+                let src_ppn = user_space.translate(vpn).unwrap().0;
+                let dst_ppn = memory_set.translate(vpn).unwrap().0;
+                // dst_ppn
+                //     .get_bytes_array()
+                //     .copy_from_slice(src_ppn.get_bytes_array());
+                dst_ppn.get_buffer().copy_from_slice(src_ppn.get_buffer())
             }
         }
         memory_set
     }
     pub fn activate(&self) {
-        let satp = self.page_table.token();
-        unsafe {
-            satp::write(satp);
-            asm!("sfence.vma");
-        }
+        self.page_table.change();
     }
-    pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
-        self.page_table.translate(vpn)
+    pub fn translate(&self, vpn: VirtPage) -> Option<(PhysPage, MappingFlags)> {
+        self.page_table
+            .translate(vpn.into())
+            .map(|(pa, flags)| (pa.into(), flags))
     }
     pub fn recycle_data_pages(&mut self) {
         //*self = Self::new_bare();
@@ -171,7 +129,7 @@ impl MemorySet {
 
 pub struct MapArea {
     vpn_range: VPNRange,
-    data_frames: BTreeMap<VirtPageNum, FrameTracker>,
+    data_frames: BTreeMap<PhysPage, FrameTracker>,
     map_type: MapType,
     map_perm: MapPermission,
 }
@@ -183,8 +141,8 @@ impl MapArea {
         map_type: MapType,
         map_perm: MapPermission,
     ) -> Self {
-        let start_vpn: VirtPageNum = start_va.floor();
-        let end_vpn: VirtPageNum = end_va.ceil();
+        let start_vpn: VirtPage = start_va.floor().into();
+        let end_vpn: VirtPage = end_va.ceil().into();
         Self {
             vpn_range: VPNRange::new(start_vpn, end_vpn),
             data_frames: BTreeMap::new(),
@@ -200,57 +158,34 @@ impl MapArea {
             map_perm: another.map_perm,
         }
     }
-    pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
-        let ppn: PhysPageNum;
-        match self.map_type {
-            MapType::Identical => {
-                ppn = PhysPageNum(vpn.0);
-            }
-            MapType::Framed => {
-                let frame = frame_alloc().unwrap();
-                ppn = frame.ppn;
-                self.data_frames.insert(vpn, frame);
-            }
-        }
-        let pte_flags = PTEFlags::from_bits(self.map_perm.bits).unwrap();
-        page_table.map(vpn, ppn, pte_flags);
-    }
-    pub fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
-        if self.map_type == MapType::Framed {
-            self.data_frames.remove(&vpn);
-        }
-        page_table.unmap(vpn);
-    }
-    pub fn map(&mut self, page_table: &mut PageTable) {
+    pub fn map(&mut self, page_table: &Arc<PageTableWrapper>) {
         for vpn in self.vpn_range {
-            self.map_one(page_table, vpn);
-        }
-    }
-    pub fn unmap(&mut self, page_table: &mut PageTable) {
-        for vpn in self.vpn_range {
-            self.unmap_one(page_table, vpn);
+            // self.map_one(page_table, vpn);
+            let p_tracker = frame_alloc().expect("can't allocate frame");
+            page_table.map(p_tracker.ppn, vpn, self.map_perm.into(), 3);
+            self.data_frames.insert(p_tracker.ppn, p_tracker);
         }
     }
     /// data: start-aligned but maybe with shorter length
     /// assume that all frames were cleared before
-    pub fn copy_data(&mut self, page_table: &mut PageTable, data: &[u8]) {
+    pub fn copy_data(&mut self, page_table: &Arc<PageTableWrapper>, data: &[u8]) {
         assert_eq!(self.map_type, MapType::Framed);
         let mut start: usize = 0;
         let mut current_vpn = self.vpn_range.get_start();
         let len = data.len();
         loop {
             let src = &data[start..len.min(start + PAGE_SIZE)];
-            let dst = &mut page_table
-                .translate(current_vpn)
-                .unwrap()
-                .ppn()
-                .get_bytes_array()[..src.len()];
+            let dst = &mut PhysPage::from(page_table.translate(current_vpn.into()).unwrap().0)
+                .get_buffer()[..src.len()];
+            info!("src: {:p}", src.as_ptr());
+            info!("copy {:?} @ {:p}", current_vpn, dst.as_ptr());
             dst.copy_from_slice(src);
             start += PAGE_SIZE;
             if start >= len {
                 break;
             }
-            current_vpn.step();
+            // current_vpn.step();
+            current_vpn = current_vpn + 1;
         }
     }
 }
@@ -267,5 +202,24 @@ bitflags! {
         const W = 1 << 2;
         const X = 1 << 3;
         const U = 1 << 4;
+    }
+}
+
+impl Into<MappingFlags> for MapPermission {
+    fn into(self) -> MappingFlags {
+        let mut flags = MappingFlags::empty();
+        if self.contains(MapPermission::R) {
+            flags |= MappingFlags::R;
+        }
+        if self.contains(MapPermission::W) {
+            flags |= MappingFlags::W;
+        }
+        if self.contains(MapPermission::X) {
+            flags |= MappingFlags::X;
+        }
+        if self.contains(MapPermission::U) {
+            flags |= MappingFlags::U;
+        }
+        flags
     }
 }

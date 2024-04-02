@@ -1,9 +1,9 @@
 use crate::fs::{make_pipe, open_file, OpenFlags};
-use crate::mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer};
+use crate::mm::{translated_byte_buffer, translated_refmut, translated_str};
 use crate::task::{current_task, current_user_token};
 use alloc::sync::Arc;
 
-pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
+pub fn sys_write(fd: usize, buf: *mut u8, len: usize) -> isize {
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.inner_exclusive_access();
@@ -17,13 +17,13 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
         let file = file.clone();
         // release current task TCB manually to avoid multi-borrow
         drop(inner);
-        file.write(UserBuffer::new(translated_byte_buffer(token, buf, len))) as isize
+        file.write(translated_byte_buffer(token, buf, len)) as isize
     } else {
         -1
     }
 }
 
-pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
+pub fn sys_read(fd: usize, buf: *mut u8, len: usize) -> isize {
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.inner_exclusive_access();
@@ -37,7 +37,7 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
         }
         // release current task TCB manually to avoid multi-borrow
         drop(inner);
-        file.read(UserBuffer::new(translated_byte_buffer(token, buf, len))) as isize
+        file.read(translated_byte_buffer(token, buf, len)) as isize
     } else {
         -1
     }

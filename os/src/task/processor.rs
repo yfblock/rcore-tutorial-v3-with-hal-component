@@ -1,24 +1,25 @@
 use super::TaskControlBlock;
-use super::__switch;
 use super::{fetch_task, TaskStatus};
 use crate::sync::UPSafeCell;
 use alloc::sync::Arc;
-use arch::TrapFrame;
+use arch::{context_switch_pt, VirtAddr};
+use arch::{kernel_page_table, KContext, PageTable};
 use lazy_static::*;
+use log::info;
 
 pub struct Processor {
     current: Option<Arc<TaskControlBlock>>,
-    idle_task_cx: TrapFrame,
+    idle_task_cx: KContext,
 }
 
 impl Processor {
     pub fn new() -> Self {
         Self {
             current: None,
-            idle_task_cx: TrapFrame::new(),
+            idle_task_cx: KContext::blank(),
         }
     }
-    fn get_idle_task_cx_ptr(&mut self) -> *mut TrapFrame {
+    fn get_idle_task_cx_ptr(&mut self) -> *mut KContext {
         &mut self.idle_task_cx as *mut _
     }
     pub fn take_current(&mut self) -> Option<Arc<TaskControlBlock>> {
@@ -40,16 +41,21 @@ pub fn run_tasks() {
             let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
             // access coming task TCB exclusively
             let mut task_inner = task.inner_exclusive_access();
-            let next_task_cx_ptr = &task_inner.task_cx as *const TrapFrame;
+            let next_task_cx_ptr = &task_inner.task_cx as *const KContext;
             task_inner.task_status = TaskStatus::Running;
+            // task_inner.memory_set.activate();
+            let token = task_inner.memory_set.token();
             drop(task_inner);
             // release coming task TCB manually
             processor.current = Some(task);
             // release processor manually
             drop(processor);
-            unsafe {
-                __switch(idle_task_cx_ptr, next_task_cx_ptr);
-            }
+            // unsafe {
+            //     __switch(idle_task_cx_ptr, next_task_cx_ptr);
+            // }
+            // token.change();
+            // unsafe { arch::context_switch(idle_task_cx_ptr, next_task_cx_ptr) }
+            unsafe { context_switch_pt(idle_task_cx_ptr, next_task_cx_ptr, token) }
         }
     }
 }
@@ -62,17 +68,21 @@ pub fn current_task() -> Option<Arc<TaskControlBlock>> {
     PROCESSOR.exclusive_access().current()
 }
 
-pub fn current_user_token() -> usize {
+pub fn current_user_token() -> PageTable {
     let task = current_task().unwrap();
     let token = task.inner_exclusive_access().get_user_token();
     token
 }
 
-pub fn schedule(switched_task_cx_ptr: *mut TrapFrame) {
+pub fn schedule(switched_task_cx_ptr: *mut KContext) {
     let mut processor = PROCESSOR.exclusive_access();
     let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
+    // switch_to_kernel_page_table();
     drop(processor);
+    // unsafe {
+    //     __switch(switched_task_cx_ptr, idle_task_cx_ptr);
+    // }
     unsafe {
-        __switch(switched_task_cx_ptr, idle_task_cx_ptr);
+        context_switch_pt(switched_task_cx_ptr, idle_task_cx_ptr, kernel_page_table());
     }
 }

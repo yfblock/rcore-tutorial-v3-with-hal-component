@@ -3,14 +3,19 @@
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 
-use core::task::Context;
-
-use arch::{ArchInterface, PhysPage, TrapFrame, TrapType};
-use config::PAGE_SIZE;
+use crate::{
+    syscall::syscall,
+    task::{
+        check_signals_error_of_current, current_add_signal, exit_current_and_run_next,
+        handle_signals, suspend_current_and_run_next, SignalFlags,
+    },
+};
+use arch::{enable_irq, ArchInterface, PhysPage, TrapFrame, TrapFrameArgs, TrapType};
 use crate_interface::impl_interface;
 use fdt::node::FdtNode;
-use mm::{frame_alloc, frame_dealloc, PhysPageNum};
+use log::{info, warn};
 
+use arch::TrapType::*;
 extern crate alloc;
 
 #[macro_use]
@@ -27,11 +32,9 @@ mod fs;
 mod lang_items;
 mod logging;
 mod mm;
-mod sbi;
 mod sync;
 mod syscall;
 mod task;
-mod timer;
 
 pub struct ArchInterfaceImpl;
 
@@ -43,11 +46,55 @@ impl ArchInterface for ArchInterfaceImpl {
     }
     /// kernel interrupt
     fn kernel_interrupt(ctx: &mut TrapFrame, trap_type: TrapType) {
-        println!("trap_type @ {:x?} {:#x?}", trap_type, ctx);
+        // println!("trap_type @ {:x?} {:#x?}", trap_type, ctx);
+        match trap_type {
+            Breakpoint => return,
+            UserEnvCall => {
+                // jump to next instruction anyway
+                ctx.syscall_ok();
+                let args = ctx.args();
+                // get system call return value
+                // info!("syscall: {}", ctx[TrapFrameArgs::SYSCALL]);
+
+                let result = syscall(ctx[TrapFrameArgs::SYSCALL], [args[0], args[1], args[2]]);
+                // cx is changed during sys_exec, so we have to call it again
+                ctx[TrapFrameArgs::RET] = result as usize;
+            }
+            StorePageFault(paddr) | LoadPageFault(paddr) | InstructionPageFault(paddr) => {
+                panic!("add page fault {:#x} {:#x?}", paddr, ctx);
+                /*
+                println!(
+                    "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.",
+                    scause.cause(),
+                    stval,
+                    current_trap_cx().sepc,
+                );
+                */
+                current_add_signal(SignalFlags::SIGSEGV);
+            }
+            IllegalInstruction(_) => {
+                current_add_signal(SignalFlags::SIGILL);
+            }
+            Time => {
+                suspend_current_and_run_next();
+            }
+            _ => {
+                warn!("unsuspended trap type: {:?}", trap_type);
+            }
+        }
+        // handle signals (handle the sent signal)
+        // println!("[K] trap_handler:: handle_signals");
+        handle_signals();
+
+        // check error signals (if error then exit)
+        if let Some((errno, msg)) = check_signals_error_of_current() {
+            println!("[kernel] {}", msg);
+            exit_current_and_run_next(errno);
+        }
     }
     /// init log
     fn init_logging() {
-        logging::init(Some("debug"));
+        logging::init(Some("trace"));
         println!("init logging");
     }
     /// add a memory region
@@ -61,9 +108,8 @@ impl ArchInterface for ArchInterfaceImpl {
             return;
         }
         println!("[kernel] Hello, world!");
-        // mm::init();
-        // trap::init();
-        timer::set_next_trigger();
+        arch::init_interrupt();
+        // enable_irq();
         fs::list_apps();
         task::add_initproc();
         task::run_tasks();
@@ -71,16 +117,17 @@ impl ArchInterface for ArchInterfaceImpl {
     }
     /// Alloc a persistent memory page.
     fn frame_alloc_persist() -> PhysPage {
-        PhysPage::new(frame_alloc().expect("can't alloc frame").ppn.0)
+        // PhysPage::new(frame_alloc())
+        mm::frame_alloc_persist().expect("can't find memory page")
     }
     /// Unalloc a persistent memory page
     fn frame_unalloc(ppn: PhysPage) {
-        frame_dealloc(PhysPageNum(ppn.to_addr() / PAGE_SIZE))
+        mm::frame_dealloc(ppn)
     }
     /// Preprare drivers.
     fn prepare_drivers() {
         println!("prepare drivers");
     }
     /// Try to add device through FdtNode
-    fn try_to_add_device(fdt_node: &FdtNode) {}
+    fn try_to_add_device(_fdt_node: &FdtNode) {}
 }
