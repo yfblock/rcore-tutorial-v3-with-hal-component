@@ -3,6 +3,7 @@ use _core::str::from_utf8_unchecked;
 use alloc::string::{String, ToString};
 use arch::PageTable;
 use bitflags::*;
+use log::info;
 
 bitflags! {
     pub struct PTEFlags: u8 {
@@ -33,8 +34,10 @@ unsafe fn str_len(ptr: *const u8) -> usize {
 
 /// Load a string from other address spaces into kernel space without an end `\0`.
 pub fn translated_str(_token: PageTable, ptr: *const u8) -> String {
+    info!("token: {:?}, ptr: {:p}", _token, ptr);
     unsafe {
         let len = str_len(ptr);
+        info!("strlen: {}", len);
         from_utf8_unchecked(slice::from_raw_parts(ptr, len)).to_string()
     }
 }

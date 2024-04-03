@@ -61,7 +61,6 @@ impl ArchInterface for ArchInterfaceImpl {
                 ctx[TrapFrameArgs::RET] = result as usize;
             }
             StorePageFault(paddr) | LoadPageFault(paddr) | InstructionPageFault(paddr) => {
-                panic!("add page fault {:#x} {:#x?}", paddr, ctx);
                 /*
                 println!(
                     "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.",

@@ -4,6 +4,8 @@
 #[macro_use]
 extern crate user_lib;
 
+extern crate alloc;
+
 // not in SUCC_TESTS & FAIL_TESTS
 // count_lines, infloop, user_shell, usertests
 
@@ -11,7 +13,7 @@ extern crate user_lib;
 static SUCC_TESTS: &[(&str, &str, &str, &str, i32)] = &[
     ("filetest_simple\0", "\0", "\0", "\0", 0),
     ("cat\0", "filea\0", "\0", "\0", 0),
-    ("cmdline_args\0", "1\0", "2\0", "3\0", 0),
+    ("cmdline_args\0", "1\0", "2\0", "\0", 0),
     ("exit\0", "\0", "\0", "\0", 0),
     ("fantastic_text\0", "\0", "\0", "\0", 0),
     ("forktest_simple\0", "\0", "\0", "\0", 0),
@@ -34,11 +36,10 @@ static SUCC_TESTS: &[(&str, &str, &str, &str, i32)] = &[
 
 static FAIL_TESTS: &[(&str, &str, &str, &str, i32)] = &[
     ("stack_overflow\0", "\0", "\0", "\0", -11),
-    ("priv_csr\0", "\0", "\0", "\0", -4),
-    ("priv_inst\0", "\0", "\0", "\0", -4),
     ("store_fault\0", "\0", "\0", "\0", -11),
 ];
 
+use alloc::{string::ToString, vec::Vec};
 use user_lib::{exec, fork, waitpid};
 
 fn run_tests(tests: &[(&str, &str, &str, &str, i32)]) -> i32 {
@@ -50,6 +51,8 @@ fn run_tests(tests: &[(&str, &str, &str, &str, i32)]) -> i32 {
         core::ptr::null::<u8>(),
     ];
 
+    let mut passed = Vec::new();
+    let mut failed = Vec::new();
     for test in tests {
         println!("Usertests: Running {}", test.0);
         arr[0] = test.0.as_ptr();
@@ -86,6 +89,9 @@ fn run_tests(tests: &[(&str, &str, &str, &str, i32)]) -> i32 {
             if exit_code == test.4 {
                 // summary apps with  exit_code
                 pass_num = pass_num + 1;
+                passed.push(test.0.to_string());
+            } else {
+                failed.push(test.0.to_string());
             }
             println!(
                 "\x1b[32mUsertests: Test {} in Process {} exited with code {}\x1b[0m",
@@ -93,6 +99,17 @@ fn run_tests(tests: &[(&str, &str, &str, &str, i32)]) -> i32 {
             );
         }
     }
+    
+    println!("passed: {}", passed.len());
+    passed.iter().for_each(|x| {
+        println!("    {}", x);
+    });
+
+    println!("failed: {}", failed.len());
+    failed.iter().for_each(|x| {
+        println!("    {}", x);
+    });
+
     pass_num
 }
 

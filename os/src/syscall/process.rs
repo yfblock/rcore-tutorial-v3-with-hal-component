@@ -23,7 +23,7 @@ pub fn sys_yield() -> isize {
 pub fn sys_get_time() -> isize {
     // get_time_ms() as isize
     // time_to_sec(get_time())
-    (time_to_usec(get_time()) * 1000) as isize
+    (time_to_usec(get_time()) / 1000) as isize
 }
 
 pub fn sys_getpid() -> isize {
@@ -47,6 +47,7 @@ pub fn sys_fork() -> isize {
 
 pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
     let token = current_user_token();
+    info!("sys_exec: {:p}  args: {:p}", path, args);
     // log::info!("path: {:p} token: {:#x} kernel token: {:#x}", path, current_user_token(), kernel_page_table_token());
     let path = translated_str(token, path);
     let mut args_vec: Vec<String> = Vec::new();
