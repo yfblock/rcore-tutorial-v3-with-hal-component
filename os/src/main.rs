@@ -10,10 +10,12 @@ use crate::{
         handle_signals, suspend_current_and_run_next, SignalFlags,
     },
 };
-use arch::{enable_irq, ArchInterface, PhysPage, TrapFrame, TrapFrameArgs, TrapType};
+use arch::{TrapFrame, TrapFrameArgs, TrapType};
+use arch::api::ArchInterface;
+use arch::addr::PhysPage;
 use crate_interface::impl_interface;
 use fdt::node::FdtNode;
-use log::{info, warn};
+use log::warn;
 
 use arch::TrapType::*;
 extern crate alloc;
@@ -60,7 +62,7 @@ impl ArchInterface for ArchInterfaceImpl {
                 // cx is changed during sys_exec, so we have to call it again
                 ctx[TrapFrameArgs::RET] = result as usize;
             }
-            StorePageFault(paddr) | LoadPageFault(paddr) | InstructionPageFault(paddr) => {
+            StorePageFault(_paddr) | LoadPageFault(_paddr) | InstructionPageFault(_paddr) => {
                 /*
                 println!(
                     "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.",

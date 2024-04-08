@@ -8,8 +8,9 @@ use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
+use arch::pagetable::PageTable;
 use arch::{
-    read_current_tp, run_user_task, KContext, KContextArgs, PageTable, TrapFrame, TrapFrameArgs,
+    read_current_tp, run_user_task, KContext, KContextArgs, TrapFrame, TrapFrameArgs,
 };
 use core::cell::RefMut;
 use core::mem::size_of;

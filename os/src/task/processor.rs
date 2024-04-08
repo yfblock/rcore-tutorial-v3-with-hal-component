@@ -2,10 +2,9 @@ use super::TaskControlBlock;
 use super::{fetch_task, TaskStatus};
 use crate::sync::UPSafeCell;
 use alloc::sync::Arc;
-use arch::{context_switch_pt, VirtAddr};
-use arch::{kernel_page_table, KContext, PageTable};
+use arch::pagetable::PageTable;
+use arch::{kernel_page_table, KContext, context_switch_pt};
 use lazy_static::*;
-use log::info;
 
 pub struct Processor {
     current: Option<Arc<TaskControlBlock>>,

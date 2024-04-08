@@ -4,8 +4,8 @@ use crate::config::{PAGE_SIZE, USER_STACK_SIZE};
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use arch::pagetable::{MappingFlags, PageTableWrapper};
-use arch::{PageTable, PhysPage, VirtAddr, VirtPage};
+use arch::pagetable::{MappingFlags, MappingSize, PageTable, PageTableWrapper};
+use arch::addr::{PhysPage, VirtAddr, VirtPage};
 
 pub struct MemorySet {
     page_table: Arc<PageTableWrapper>,
@@ -126,7 +126,7 @@ impl MemorySet {
 }
 
 pub struct MapArea {
-    vpn_range: VPNRange,
+    pub vpn_range: VPNRange,
     data_frames: BTreeMap<PhysPage, FrameTracker>,
     map_type: MapType,
     map_perm: MapPermission,
@@ -160,7 +160,7 @@ impl MapArea {
         for vpn in self.vpn_range {
             // self.map_one(page_table, vpn);
             let p_tracker = frame_alloc().expect("can't allocate frame");
-            page_table.map(p_tracker.ppn, vpn, self.map_perm.into(), 3);
+            page_table.map_page(vpn, p_tracker.ppn, self.map_perm.into(), MappingSize::Page4KB);
             self.data_frames.insert(p_tracker.ppn, p_tracker);
         }
     }

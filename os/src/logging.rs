@@ -1,4 +1,4 @@
-use arch::{console_getchar, console_putchar};
+use arch::console_putchar;
 use core::fmt::{self, Write};
 
 use log::{self, info, Level, LevelFilter, Log, Metadata, Record};

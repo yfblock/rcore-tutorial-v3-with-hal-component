@@ -14,7 +14,7 @@ impl File for Stdin {
     fn writable(&self) -> bool {
         false
     }
-    fn read(&self, mut user_buf: &mut [u8]) -> usize {
+    fn read(&self, user_buf: &mut [u8]) -> usize {
         assert_eq!(user_buf.len(), 1);
         // busy loop
         let c: u8;
@@ -25,10 +25,7 @@ impl File for Stdin {
             }
             suspend_current_and_run_next();
         }
-        let ch = c as u8;
-        unsafe {
-            user_buf[0] = ch;
-        }
+        user_buf[0] = c as u8;
         1
     }
     fn write(&self, _user_buf: &mut [u8]) -> usize {

@@ -7,7 +7,8 @@ use crate::task::{
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use arch::{get_time, time_to_usec, TrapFrameArgs};
+use arch::time::Time;
+use arch::TrapFrameArgs;
 use log::info;
 
 pub fn sys_exit(exit_code: i32) -> ! {
@@ -23,7 +24,8 @@ pub fn sys_yield() -> isize {
 pub fn sys_get_time() -> isize {
     // get_time_ms() as isize
     // time_to_sec(get_time())
-    (time_to_usec(get_time()) / 1000) as isize
+    // (time_to_usec(get_time()) / 1000) as isize
+    Time::now().to_msec() as isize
 }
 
 pub fn sys_getpid() -> isize {

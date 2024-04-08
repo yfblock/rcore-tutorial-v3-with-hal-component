@@ -1,6 +1,7 @@
 use crate::sync::UPSafeCell;
 use alloc::vec::Vec;
-use arch::{PhysAddr, PhysPage, PAGE_SIZE, VIRT_ADDR_START};
+use arch::{PAGE_SIZE, VIRT_ADDR_START};
+use arch::addr::{PhysAddr, PhysPage};
 use core::{
     fmt::{self, Debug, Formatter},
     mem::size_of,
