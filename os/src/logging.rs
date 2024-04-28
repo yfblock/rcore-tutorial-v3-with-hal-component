@@ -1,6 +1,6 @@
-use arch::console_putchar;
 use core::fmt::{self, Write};
 
+use arch::debug::DebugConsole;
 use log::{self, info, Level, LevelFilter, Log, Metadata, Record};
 
 pub struct Logger;
@@ -69,6 +69,6 @@ pub fn init(level: Option<&str>) {
 pub fn puts(buffer: &[u8]) {
     // use the main uart if it exists.
     for i in buffer {
-        console_putchar(*i);
+        DebugConsole::putchar(*i);
     }
 }

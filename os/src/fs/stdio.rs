@@ -1,4 +1,4 @@
-use arch::console_getchar;
+use arch::debug::DebugConsole;
 
 use super::File;
 use crate::task::suspend_current_and_run_next;
@@ -19,7 +19,7 @@ impl File for Stdin {
         // busy loop
         let c: u8;
         loop {
-            if let Some(ch) = console_getchar() {
+            if let Some(ch) = DebugConsole::getchar() {
                 c = ch;
                 break;
             }

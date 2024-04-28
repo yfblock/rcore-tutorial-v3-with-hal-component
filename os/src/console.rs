@@ -1,13 +1,13 @@
 use core::fmt::{self, Write};
 
-use arch::console_putchar;
+use arch::debug::DebugConsole;
 
 struct Stdout;
 
 impl Write for Stdout {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for c in s.bytes() {
-            console_putchar(c);
+            DebugConsole::putchar(c);
         }
         Ok(())
     }
