@@ -156,6 +156,7 @@ impl MapArea {
     }
 
     /// Unmap page area
+    #[allow(unused)]
     pub fn unmap(&mut self, page_table: &Arc<PageTableWrapper>) {
         for vpn in self.vpn_range {
             page_table.unmap_page(vpn);
@@ -186,7 +187,7 @@ impl MapArea {
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum MapType {
-    Identical,
+//  Identical, not used now
     Framed,
 }
 

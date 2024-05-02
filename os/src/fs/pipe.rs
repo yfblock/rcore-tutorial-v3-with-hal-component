@@ -129,9 +129,7 @@ impl File for Pipe {
             }
             for _ in 0..loop_read {
                 if let Some(byte_ref) = buf_iter.next() {
-                    unsafe {
-                        *byte_ref = ring_buffer.read_byte();
-                    }
+                    *byte_ref = ring_buffer.read_byte();
                     already_read += 1;
                     if already_read == want_to_read {
                         return want_to_read;
@@ -158,7 +156,7 @@ impl File for Pipe {
             // write at most loop_write bytes
             for _ in 0..loop_write {
                 if let Some(byte_ref) = buf_iter.next() {
-                    ring_buffer.write_byte(unsafe { *byte_ref });
+                    ring_buffer.write_byte( *byte_ref );
                     already_write += 1;
                     if already_write == want_to_write {
                         return want_to_write;
