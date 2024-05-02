@@ -33,7 +33,6 @@ impl MemorySet {
     /// also returns user_sp and entry point.
     pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize) {
         let mut memory_set = Self::new_bare();
-        // map trampoline
         // map program headers of elf, with U flag
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
         let elf_header = elf.header;
@@ -89,12 +88,6 @@ impl MemorySet {
     }
     pub fn from_existed_user(user_space: &MemorySet) -> MemorySet {
         let mut memory_set = Self::new_bare();
-        // let pt = Arc::new(PageTableWrapper::alloc());
-        // info!("pt");
-        // let mut memory_set = MemorySet {
-        //     page_table: pt,
-        //     areas: Vec::new(),
-        // };
         // copy data sections/trap_context/user_stack
         for area in user_space.areas.iter() {
             let new_area = MapArea::from_another(area);
@@ -103,9 +96,6 @@ impl MemorySet {
             for vpn in area.vpn_range {
                 let src_ppn = user_space.translate(vpn).unwrap().0;
                 let dst_ppn = memory_set.translate(vpn).unwrap().0;
-                // dst_ppn
-                //     .get_bytes_array()
-                //     .copy_from_slice(src_ppn.get_bytes_array());
                 dst_ppn.get_buffer().copy_from_slice(src_ppn.get_buffer())
             }
         }
@@ -127,7 +117,7 @@ impl MemorySet {
 
 pub struct MapArea {
     pub vpn_range: VPNRange,
-    data_frames: BTreeMap<PhysPage, FrameTracker>,
+    data_frames: BTreeMap<PhysPage, FrameTracker>, //???
     map_type: MapType,
     map_perm: MapPermission,
 }
@@ -164,6 +154,7 @@ impl MapArea {
             self.data_frames.insert(p_tracker.ppn, p_tracker);
         }
     }
+    // unmap???
     /// data: start-aligned but maybe with shorter length
     /// assume that all frames were cleared before
     pub fn copy_data(&mut self, page_table: &Arc<PageTableWrapper>, data: &[u8]) {
