@@ -8,9 +8,9 @@ mod task;
 
 use crate::fs::{open_file, OpenFlags};
 use alloc::sync::Arc;
-use arch::shutdown;
-use arch::KContext;
-use arch::TrapFrameArgs;
+use polyhal::shutdown;
+use polyhal::KContext;
+use polyhal::TrapFrameArgs;
 use lazy_static::*;
 use log::info;
 use manager::fetch_task;

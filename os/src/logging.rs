@@ -1,6 +1,6 @@
 use core::fmt::{self, Write};
 
-use arch::debug::DebugConsole;
+use polyhal::debug::DebugConsole;
 use log::{self, info, Level, LevelFilter, Log, Metadata, Record};
 
 pub struct Logger;

@@ -1,5 +1,5 @@
 use core::{
-    arch::global_asm,
+    polyhal::global_asm,
     ptr::{slice_from_raw_parts, slice_from_raw_parts_mut},
 };
 

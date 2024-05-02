@@ -1,4 +1,4 @@
-use arch::addr::VirtPage;
+use polyhal::addr::VirtPage;
 
 #[derive(Copy, Clone, Debug)]
 pub struct VPNRange {

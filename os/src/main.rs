@@ -10,12 +10,12 @@ use crate::{
         handle_signals, suspend_current_and_run_next, SignalFlags,
     },
 };
-use arch::{get_mem_areas, PageAlloc, TrapFrame, TrapFrameArgs, TrapType};
-// use arch::api::ArchInterface;
-use arch::addr::PhysPage;
+use polyhal::{get_mem_areas, PageAlloc, TrapFrame, TrapFrameArgs, TrapType};
+// use polyhal::api::ArchInterface;
+use polyhal::addr::PhysPage;
 use log::warn;
 
-use arch::TrapType::*;
+use polyhal::TrapType::*;
 extern crate alloc;
 
 #[macro_use]
@@ -39,7 +39,7 @@ mod task;
 pub struct ArchInterfaceImpl;
 
 /// kernel interrupt
-#[arch::arch_interrupt]
+#[polyhal::arch_interrupt]
 fn kernel_interrupt(ctx: &mut TrapFrame, trap_type: TrapType) {
     // println!("trap_type @ {:x?} {:#x?}", trap_type, ctx);
     match trap_type {
@@ -87,7 +87,7 @@ fn kernel_interrupt(ctx: &mut TrapFrame, trap_type: TrapType) {
     }
 }
 
-#[arch::arch_entry]
+#[polyhal::arch_entry]
 fn main(hartid: usize) {
     if hartid != 0 {
         return;
@@ -96,9 +96,9 @@ fn main(hartid: usize) {
     mm::init_heap();
     logging::init(Some("trace"));
     println!("init logging");
-    arch::init_interrupt();
+    polyhal::init_interrupt();
 
-    arch::init(&PageAllocImpl);
+    polyhal::init(&PageAllocImpl);
     get_mem_areas().into_iter().for_each(|(start, size)| {
         println!("init memory region {:#x} - {:#x}", start, start + size);
         mm::init_frame_allocator(start, start + size);

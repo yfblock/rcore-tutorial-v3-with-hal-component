@@ -8,8 +8,8 @@ use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
-use arch::pagetable::PageTable;
-use arch::{
+use polyhal::pagetable::PageTable;
+use polyhal::{
     read_current_tp, run_user_task, KContext, KContextArgs, TrapFrame, TrapFrameArgs,
 };
 use core::cell::RefMut;

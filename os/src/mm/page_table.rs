@@ -1,7 +1,7 @@
 use _core::slice;
 use _core::str::from_utf8_unchecked;
 use alloc::string::{String, ToString};
-use arch::pagetable::PageTable;
+use polyhal::pagetable::PageTable;
 use bitflags::*;
 
 bitflags! {

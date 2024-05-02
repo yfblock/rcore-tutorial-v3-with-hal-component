@@ -1,6 +1,6 @@
 use core::fmt::{self, Write};
 
-use arch::debug::DebugConsole;
+use polyhal::debug::DebugConsole;
 
 struct Stdout;
 
