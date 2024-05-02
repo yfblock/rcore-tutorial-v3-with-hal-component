@@ -22,9 +22,6 @@ pub fn sys_yield() -> isize {
 }
 
 pub fn sys_get_time() -> isize {
-    // get_time_ms() as isize
-    // time_to_sec(get_time())
-    // (time_to_usec(get_time()) / 1000) as isize
     Time::now().to_msec() as isize
 }
 
@@ -40,7 +37,6 @@ pub fn sys_fork() -> isize {
     let trap_cx = new_task.inner_exclusive_access().get_trap_cx();
     // we do not have to move to next instruction since we have done it before
     // for child process, fork returns 0
-    // trap_cx.x[10] = 0;
     trap_cx[TrapFrameArgs::RET] = 0;
     // add new task to scheduler
     add_task(new_task);
