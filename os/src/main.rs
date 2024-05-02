@@ -14,7 +14,6 @@ use polyhal::{get_mem_areas, PageAlloc, TrapFrame, TrapFrameArgs, TrapType};
 // use polyhal::api::ArchInterface;
 use polyhal::addr::PhysPage;
 use log::warn;
-
 use polyhal::TrapType::*;
 extern crate alloc;
 
@@ -103,12 +102,11 @@ fn main(hartid: usize) {
         println!("init memory region {:#x} - {:#x}", start, start + size);
         mm::init_frame_allocator(start, start + size);
     });
-    
-    // enable_irq();
+
     fs::list_apps();
     task::add_initproc();
     task::run_tasks();
-    panic!("Unreachable in rust_main!");
+    panic!("Unreachable in main function of rCore Tutorial kernel!");
 }
 
 pub struct PageAllocImpl;

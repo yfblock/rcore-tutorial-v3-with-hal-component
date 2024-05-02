@@ -55,13 +55,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
             "[kernel] Idle process exit with exit_code {} ...",
             exit_code
         );
-        if exit_code != 0 {
-            //crate::sbi::shutdown(255); //255 == -1 for err hint
-            shutdown()
-        } else {
-            //crate::sbi::shutdown(0); //0 for success hint
-            shutdown()
-        }
+        shutdown();
     }
 
     // remove from pid2task
