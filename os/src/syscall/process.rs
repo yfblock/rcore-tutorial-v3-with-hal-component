@@ -7,8 +7,8 @@ use crate::task::{
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use arch::time::Time;
-use arch::TrapFrameArgs;
+use polyhal::time::Time;
+use polyhal::TrapFrameArgs;
 use log::info;
 
 pub fn sys_exit(exit_code: i32) -> ! {

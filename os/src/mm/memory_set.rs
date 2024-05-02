@@ -4,8 +4,8 @@ use crate::config::{PAGE_SIZE, USER_STACK_SIZE};
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use arch::pagetable::{MappingFlags, MappingSize, PageTable, PageTableWrapper};
-use arch::addr::{PhysPage, VirtAddr, VirtPage};
+use polyhal::pagetable::{MappingFlags, MappingSize, PageTable, PageTableWrapper};
+use polyhal::addr::{PhysPage, VirtAddr, VirtPage};
 
 pub struct MemorySet {
     page_table: Arc<PageTableWrapper>,

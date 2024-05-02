@@ -2,8 +2,8 @@ use super::TaskControlBlock;
 use super::{fetch_task, TaskStatus};
 use crate::sync::UPSafeCell;
 use alloc::sync::Arc;
-use arch::pagetable::PageTable;
-use arch::{kernel_page_table, KContext, context_switch_pt};
+use polyhal::pagetable::PageTable;
+use polyhal::{kernel_page_table, KContext, context_switch_pt};
 use lazy_static::*;
 
 pub struct Processor {
@@ -53,7 +53,7 @@ pub fn run_tasks() {
             //     __switch(idle_task_cx_ptr, next_task_cx_ptr);
             // }
             // token.change();
-            // unsafe { arch::context_switch(idle_task_cx_ptr, next_task_cx_ptr) }
+            // unsafe { polyhal::context_switch(idle_task_cx_ptr, next_task_cx_ptr) }
             unsafe { context_switch_pt(idle_task_cx_ptr, next_task_cx_ptr, token) }
         }
     }

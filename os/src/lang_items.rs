@@ -1,4 +1,4 @@
-use arch::shutdown;
+use polyhal::shutdown;
 use core::panic::PanicInfo;
 use log::*;
 
