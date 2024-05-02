@@ -22,24 +22,24 @@ jobs:
           crate: cargo-binutils
           version: latest
           use-tool-cache: true
-      - name: Cache QEMU
-        uses: actions/cache@v3
-        with:
-          path: qemu-7.0.0
-          key: qemu-7.0.0-x86_64-riscv64
-      - name: Install QEMU
-        run: |
-          sudo apt-get update
-          sudo apt-get install ninja-build -y
-          if [ ! -d qemu-7.0.0 ]; then
-            wget https://download.qemu.org/qemu-7.0.0.tar.xz
-            tar -xf qemu-7.0.0.tar.xz
-          fi
-          cd qemu-7.0.0
-          ./configure --target-list=riscv64-softmmu
-          make -j
-          sudo make install
-          qemu-system-riscv64 --version
+      # - name: Cache QEMU
+      #   uses: actions/cache@v3
+      #   with:
+      #     path: qemu-7.0.0
+      #     key: qemu-7.0.0-x86_64-riscv64
+      # - name: Install QEMU
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get install ninja-build -y
+      #     if [ ! -d qemu-7.0.0 ]; then
+      #       wget https://download.qemu.org/qemu-7.0.0.tar.xz
+      #       tar -xf qemu-7.0.0.tar.xz
+      #     fi
+      #     cd qemu-7.0.0
+      #     ./configure --target-list=riscv64-softmmu
+      #     make -j
+      #     sudo make install
+      #     qemu-system-riscv64 --version
       - name: Test Build riscv64
         run: cd os && make ARCH=riscv64 build
       - name: Test Build aarch64
@@ -49,5 +49,5 @@ jobs:
       - name: Test Build loongarch64
         run: cd os && make ARCH=loongarch64 build
         # run: cd os && make run TEST=1
-        timeout-minutes: 10
+        # timeout-minutes: 10
       
