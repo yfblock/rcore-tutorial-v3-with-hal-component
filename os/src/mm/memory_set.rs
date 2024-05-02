@@ -117,7 +117,7 @@ impl MemorySet {
 
 pub struct MapArea {
     pub vpn_range: VPNRange,
-    data_frames: BTreeMap<PhysPage, FrameTracker>, //???
+    data_frames: BTreeMap<VirtPage, FrameTracker>, //???
     map_type: MapType,
     map_perm: MapPermission,
 }
@@ -151,10 +151,17 @@ impl MapArea {
             // self.map_one(page_table, vpn);
             let p_tracker = frame_alloc().expect("can't allocate frame");
             page_table.map_page(vpn, p_tracker.ppn, self.map_perm.into(), MappingSize::Page4KB);
-            self.data_frames.insert(p_tracker.ppn, p_tracker);
+            self.data_frames.insert(vpn, p_tracker);
         }
     }
-    // unmap???
+
+    /// Unmap page area
+    pub fn unmap(&mut self, page_table: &Arc<PageTableWrapper>) {
+        for vpn in self.vpn_range {
+            page_table.unmap_page(vpn);
+        }
+    }
+
     /// data: start-aligned but maybe with shorter length
     /// assume that all frames were cleared before
     pub fn copy_data(&mut self, page_table: &Arc<PageTableWrapper>, data: &[u8]) {
