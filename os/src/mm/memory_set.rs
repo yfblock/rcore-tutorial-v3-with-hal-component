@@ -117,7 +117,7 @@ impl MemorySet {
 
 pub struct MapArea {
     pub vpn_range: VPNRange,
-    data_frames: BTreeMap<VirtPage, FrameTracker>, //???
+    data_frames: BTreeMap<VirtPage, FrameTracker>,
     map_type: MapType,
     map_perm: MapPermission,
 }
