@@ -128,21 +128,3 @@ pub fn frame_alloc_persist() -> Option<PhysPage> {
 pub fn frame_dealloc(ppn: PhysPage) {
     FRAME_ALLOCATOR.exclusive_access().dealloc(ppn);
 }
-
-#[allow(unused)]
-pub fn frame_allocator_test() {
-    let mut v: Vec<FrameTracker> = Vec::new();
-    for i in 0..5 {
-        let frame = frame_alloc().unwrap();
-        println!("{:?}", frame);
-        v.push(frame);
-    }
-    v.clear();
-    for i in 0..5 {
-        let frame = frame_alloc().unwrap();
-        println!("{:?}", frame);
-        v.push(frame);
-    }
-    drop(v);
-    println!("frame_allocator_test passed!");
-}
