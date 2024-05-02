@@ -27,6 +27,7 @@ pub struct KernelStack {
 }
 
 impl KernelStack {
+    ///???
     pub fn new() -> Self {
         Self {
             inner: Arc::new([0u128; KERNEL_STACK_SIZE / size_of::<u128>()]),
@@ -147,7 +148,7 @@ impl TaskControlBlock {
                     killed: false,
                     frozen: false,
                     trap_ctx_backup: None,
-                    kernel_stack: kstack,
+                    kernel_stack: kstack, //???
                 })
             },
         };
@@ -156,7 +157,7 @@ impl TaskControlBlock {
         // *trap_cx = TrapFrame::app_init_context(entry_point, user_sp, kernel_stack_top);
         trap_cx[TrapFrameArgs::SEPC] = entry_point;
         trap_cx[TrapFrameArgs::SP] = user_sp;
-        // TODO: Set Kernel Stack Top
+        // TODO: Set Kernel Stack Top???
         task_control_block
     }
     pub fn exec(&self, elf_data: &[u8], args: Vec<String>) {
@@ -251,7 +252,7 @@ impl TaskControlBlock {
                     killed: false,
                     frozen: false,
                     trap_ctx_backup: None,
-                    kernel_stack: kstack,
+                    kernel_stack: kstack, //???
                 })
             },
         });

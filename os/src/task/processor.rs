@@ -49,11 +49,7 @@ pub fn run_tasks() {
             processor.current = Some(task);
             // release processor manually
             drop(processor);
-            // unsafe {
-            //     __switch(idle_task_cx_ptr, next_task_cx_ptr);
-            // }
-            // token.change();
-            // unsafe { polyhal::context_switch(idle_task_cx_ptr, next_task_cx_ptr) }
+            // from idel_task, switch to next task with next task's page table
             unsafe { context_switch_pt(idle_task_cx_ptr, next_task_cx_ptr, token) }
         }
     }
@@ -76,11 +72,8 @@ pub fn current_user_token() -> PageTable {
 pub fn schedule(switched_task_cx_ptr: *mut KContext) {
     let mut processor = PROCESSOR.exclusive_access();
     let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
-    // switch_to_kernel_page_table();
     drop(processor);
-    // unsafe {
-    //     __switch(switched_task_cx_ptr, idle_task_cx_ptr);
-    // }
+    // from switched task, switch to idle task with kernel page table
     unsafe {
         context_switch_pt(switched_task_cx_ptr, idle_task_cx_ptr, kernel_page_table());
     }
