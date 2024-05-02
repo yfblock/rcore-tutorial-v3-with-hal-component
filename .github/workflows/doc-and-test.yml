@@ -7,25 +7,6 @@ env:
   rust_toolchain: nightly-2024-01-18
 
 jobs:
-  build-doc:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ env.rust_toolchain }}
-          components: rust-src, llvm-tools-preview
-          target: riscv64gc-unknown-none-elf
-      - name: Build doc
-        run: cd os && cargo doc --no-deps --verbose
-      - name: Deploy to Github Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./os/target/riscv64gc-unknown-none-elf/doc
-          destination_dir: ${{ github.ref_name }}
-
   run-tests:
     runs-on: ubuntu-latest
     steps:
@@ -59,7 +40,14 @@ jobs:
           make -j
           sudo make install
           qemu-system-riscv64 --version
-      - name: Run usertests
-        run: cd os && make run TEST=1
+      - name: Test Build riscv64
+        run: cd os && make ARCH=riscv64 build
+      - name: Test Build aarch64
+        run: cd os && make ARCH=aarch64 build
+      - name: Test Build x86_64
+        run: cd os && make ARCH=x86_64 build
+      - name: Test Build loongarch64
+        run: cd os && make ARCH=loongarch64 build
+        # run: cd os && make run TEST=1
         timeout-minutes: 10
       

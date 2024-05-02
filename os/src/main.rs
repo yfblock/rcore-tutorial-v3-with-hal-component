@@ -12,9 +12,8 @@ use crate::{
 };
 use polyhal::{get_mem_areas, PageAlloc, TrapFrame, TrapFrameArgs, TrapType};
 // use polyhal::api::ArchInterface;
-use log::warn;
 use polyhal::addr::PhysPage;
-
+use log::warn;
 use polyhal::TrapType::*;
 extern crate alloc;
 
