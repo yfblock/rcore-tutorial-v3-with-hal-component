@@ -22,12 +22,17 @@ pub struct TaskControlBlock {
     inner: UPSafeCell<TaskControlBlockInner>,
 }
 
+impl Drop for TaskControlBlock {
+    fn drop(&mut self) {
+        println!("drop task control block");
+    }
+}
+
 pub struct KernelStack {
     inner: Arc<[u128; KERNEL_STACK_SIZE / size_of::<u128>()]>,
 }
 
 impl KernelStack {
-    ///???
     pub fn new() -> Self {
         Self {
             inner: Arc::new([0u128; KERNEL_STACK_SIZE / size_of::<u128>()]),
@@ -127,7 +132,7 @@ impl TaskControlBlock {
                 UPSafeCell::new(TaskControlBlockInner {
                     trap_cx: TrapFrame::new(),
                     base_size: user_sp,
-                    task_cx: blank_kcontext(kstack.get_position().1),
+                    task_cx: blank_kcontext(kstack.get_position().1), // Set task_cx's Kernel Stack Top
                     task_status: TaskStatus::Ready,
                     memory_set,
                     parent: None,
@@ -148,16 +153,14 @@ impl TaskControlBlock {
                     killed: false,
                     frozen: false,
                     trap_ctx_backup: None,
-                    kernel_stack: kstack, //???
+                    kernel_stack: kstack,
                 })
             },
         };
         // prepare TrapContext in user space
         let trap_cx = task_control_block.inner_exclusive_access().get_trap_cx();
-        // *trap_cx = TrapFrame::app_init_context(entry_point, user_sp, kernel_stack_top);
         trap_cx[TrapFrameArgs::SEPC] = entry_point;
         trap_cx[TrapFrameArgs::SP] = user_sp;
-        // TODO: Set Kernel Stack Top???
         task_control_block
     }
     pub fn exec(&self, elf_data: &[u8], args: Vec<String>) {
@@ -203,7 +206,6 @@ impl TaskControlBlock {
         trap_cx[TrapFrameArgs::SP] = user_sp;
         trap_cx[TrapFrameArgs::ARG0] = args.len();
         trap_cx[TrapFrameArgs::ARG1] = argv_base;
-        // TODO: Set Kernel Stack Top
         *inner.get_trap_cx() = trap_cx;
         // **** release current PCB
     }
@@ -215,12 +217,6 @@ impl TaskControlBlock {
 
         // alloc a pid and a kernel stack in kernel space
         let pid_handle = pid_alloc();
-        // let (_kernel_stack_bottom, kernel_stack_top) = kernel_stack_position();
-        // memory_set.insert_framed_area(
-        //     kernel_stack_bottom.into(),
-        //     kernel_stack_top.into(),
-        //     MapPermission::R | MapPermission::W,
-        // );
         let kstack = KernelStack::new();
         // copy fd table
         let mut new_fd_table: Vec<Option<Arc<dyn File + Send + Sync>>> = Vec::new();
@@ -237,7 +233,7 @@ impl TaskControlBlock {
                 UPSafeCell::new(TaskControlBlockInner {
                     trap_cx: parent_inner.trap_cx.clone(),
                     base_size: parent_inner.base_size,
-                    task_cx: blank_kcontext(kstack.get_position().1),
+                    task_cx: blank_kcontext(kstack.get_position().1), // Set task_cx's Kernel Stack Top
                     task_status: TaskStatus::Ready,
                     memory_set,
                     parent: Some(Arc::downgrade(self)),
@@ -252,7 +248,7 @@ impl TaskControlBlock {
                     killed: false,
                     frozen: false,
                     trap_ctx_backup: None,
-                    kernel_stack: kstack, //???
+                    kernel_stack: kstack,
                 })
             },
         });
