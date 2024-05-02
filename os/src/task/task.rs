@@ -21,10 +21,10 @@ pub struct TaskControlBlock {
     // mutable
     inner: UPSafeCell<TaskControlBlockInner>,
 }
-
+use log::*;
 impl Drop for TaskControlBlock {
     fn drop(&mut self) {
-        println!("drop task control block");
+        trace!("drop task control block");
     }
 }
 
