@@ -5,7 +5,7 @@ use core::{
 
 extern crate alloc;
 
-use easy_fs::BlockDevice;
+use easyfs::BlockDevice;
 use log::info;
 
 // 虚拟IO设备

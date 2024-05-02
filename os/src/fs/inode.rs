@@ -4,7 +4,7 @@ use crate::sync::UPSafeCell;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::*;
-use easy_fs::{EasyFileSystem, Inode};
+use easyfs::{EasyFileSystem, Inode};
 use lazy_static::*;
 
 pub struct OSInode {

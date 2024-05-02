@@ -7,7 +7,7 @@ mod virtio_blk;
 pub use virtio_blk::VirtIOBlock;
 
 use alloc::sync::Arc;
-use easy_fs::BlockDevice;
+use easyfs::BlockDevice;
 use lazy_static::*;
 
 #[cfg(any(target_arch = "x86_64", target_arch = "loongarch64"))]

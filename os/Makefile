@@ -73,7 +73,7 @@ $(KERNEL_BIN): kernel
 fs-img: $(APPS)
 	@cd ../user && make build TARGET=$(TARGET) TEST=$(TEST)
 	@rm -f $(FS_IMG)
-	@cd ../easy-fs-fuse && cargo run --release -- -s ../user/src/bin/ -t ../user/target/$(TARGET)/release/
+	@cargo install easyfs-packer && easyfs-packer -s ../user/src/bin/ -t ../user/target/$(TARGET)/release/
 	cp ../user/target/$(TARGET)/$(MODE)/fs.img fs-img.img
 
 $(APPS):

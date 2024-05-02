@@ -117,7 +117,7 @@ impl MemorySet {
 
 pub struct MapArea {
     pub vpn_range: VPNRange,
-    data_frames: BTreeMap<VirtPage, FrameTracker>, //???
+    data_frames: BTreeMap<VirtPage, FrameTracker>,
     map_type: MapType,
     map_perm: MapPermission,
 }
@@ -156,6 +156,7 @@ impl MapArea {
     }
 
     /// Unmap page area
+    #[allow(unused)]
     pub fn unmap(&mut self, page_table: &Arc<PageTableWrapper>) {
         for vpn in self.vpn_range {
             page_table.unmap_page(vpn);
@@ -186,7 +187,7 @@ impl MapArea {
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum MapType {
-    Identical,
+//  Identical, not used now
     Framed,
 }
 
