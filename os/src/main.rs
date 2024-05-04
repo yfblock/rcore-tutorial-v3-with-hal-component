@@ -92,7 +92,7 @@ fn main(hartid: usize) {
     mm::init_heap();
     logging::init(Some("trace"));
     println!("init logging");
-    polyhal::init_interrupt();
+    // polyhal::init_interrupt(); done in polyhal::CPU::rust_main()
 
     polyhal::init(&PageAllocImpl);
     get_mem_areas().into_iter().for_each(|(start, size)| {
