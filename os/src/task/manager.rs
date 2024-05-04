@@ -3,7 +3,7 @@ use crate::sync::UPSafeCell;
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::sync::Arc;
 use lazy_static::*;
-
+use log::*;
 pub struct TaskManager {
     ready_queue: VecDeque<Arc<TaskControlBlock>>,
 }
@@ -31,6 +31,7 @@ lazy_static! {
 }
 
 pub fn add_task(task: Arc<TaskControlBlock>) {
+    //trace!("os::task::manager::add_task");
     PID2TCB
         .exclusive_access()
         .insert(task.getpid(), Arc::clone(&task));
@@ -38,6 +39,7 @@ pub fn add_task(task: Arc<TaskControlBlock>) {
 }
 
 pub fn fetch_task() -> Option<Arc<TaskControlBlock>> {
+    //trace!("os::task::manager::fetch_task");
     TASK_MANAGER.exclusive_access().fetch()
 }
 

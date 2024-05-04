@@ -21,10 +21,11 @@ mod process;
 
 use fs::*;
 use process::*;
-
+use log::*;
 use crate::task::SignalAction;
 
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
+    trace!("syscall: id: {}, args: {:?}", syscall_id, args);
     match syscall_id {
         SYSCALL_DUP => sys_dup(args[0]),
         SYSCALL_OPEN => sys_open(args[0] as *const u8, args[1] as u32),

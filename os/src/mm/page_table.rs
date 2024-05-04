@@ -3,7 +3,7 @@ use _core::str::from_utf8_unchecked;
 use alloc::string::{String, ToString};
 use polyhal::pagetable::PageTable;
 use bitflags::*;
-
+use log::*;
 bitflags! {
     pub struct PTEFlags: u8 {
         const V = 1 << 0;
@@ -18,6 +18,7 @@ bitflags! {
 }
 
 pub fn translated_byte_buffer(_token: PageTable, ptr: *mut u8, len: usize) -> &'static mut [u8] {
+    trace!("os::mm::page_table::translated_byte_buffer");
     unsafe { core::slice::from_raw_parts_mut(ptr, len) }
 }
 

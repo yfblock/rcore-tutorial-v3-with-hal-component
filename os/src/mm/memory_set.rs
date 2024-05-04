@@ -6,7 +6,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use polyhal::pagetable::{MappingFlags, MappingSize, PageTable, PageTableWrapper};
 use polyhal::addr::{PhysPage, VirtAddr, VirtPage};
-
+use log::*;
 pub struct MemorySet {
     page_table: Arc<PageTableWrapper>,
     areas: Vec<MapArea>,
@@ -32,6 +32,7 @@ impl MemorySet {
     /// Include sections in elf and trampoline and TrapContext and user stack,
     /// also returns user_sp and entry point.
     pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize) {
+        trace!("os::mm::MemorySet::from_elf");
         let mut memory_set = Self::new_bare();
         // map program headers of elf, with U flag
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
@@ -87,6 +88,7 @@ impl MemorySet {
         )
     }
     pub fn from_existed_user(user_space: &MemorySet) -> MemorySet {
+        trace!("os::mm::MemorySet::from_existed_user");
         let mut memory_set = Self::new_bare();
         // copy data sections/trap_context/user_stack
         for area in user_space.areas.iter() {
@@ -110,7 +112,7 @@ impl MemorySet {
             .map(|(pa, flags)| (pa.into(), flags))
     }
     pub fn recycle_data_pages(&mut self) {
-        //*self = Self::new_bare();
+        //*self = Self::new_bare(); 
         self.areas.clear();
     }
 }
@@ -147,6 +149,7 @@ impl MapArea {
         }
     }
     pub fn map(&mut self, page_table: &Arc<PageTableWrapper>) {
+        trace!("os::mm::memory_set::MapArea::map");
         for vpn in self.vpn_range {
             // self.map_one(page_table, vpn);
             let p_tracker = frame_alloc().expect("can't allocate frame");
@@ -158,6 +161,7 @@ impl MapArea {
     /// Unmap page area
     #[allow(unused)]
     pub fn unmap(&mut self, page_table: &Arc<PageTableWrapper>) {
+        trace!("os::mm::memory_set::MapArea::unmap");
         for vpn in self.vpn_range {
             page_table.unmap_page(vpn);
         }
@@ -166,6 +170,7 @@ impl MapArea {
     /// data: start-aligned but maybe with shorter length
     /// assume that all frames were cleared before
     pub fn copy_data(&mut self, page_table: &Arc<PageTableWrapper>, data: &[u8]) {
+        trace!("os::mm::memory_set::MapArea::copy_data");
         assert_eq!(self.map_type, MapType::Framed);
         let mut start: usize = 0;
         let mut current_vpn = self.vpn_range.get_start();

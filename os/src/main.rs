@@ -13,7 +13,7 @@ use crate::{
 use polyhal::{get_mem_areas, PageAlloc, TrapFrame, TrapFrameArgs, TrapType};
 // use polyhal::api::ArchInterface;
 use polyhal::addr::PhysPage;
-use log::warn;
+use log::*;
 use polyhal::TrapType::*;
 extern crate alloc;
 
@@ -37,7 +37,7 @@ pub struct ArchInterfaceImpl;
 /// kernel interrupt
 #[polyhal::arch_interrupt]
 fn kernel_interrupt(ctx: &mut TrapFrame, trap_type: TrapType) {
-    // println!("trap_type @ {:x?} {:#x?}", trap_type, ctx);
+    // trace!("trap_type @ {:x?} {:#x?}", trap_type, ctx);
     match trap_type {
         Breakpoint => return,
         UserEnvCall => {
@@ -85,6 +85,7 @@ fn kernel_interrupt(ctx: &mut TrapFrame, trap_type: TrapType) {
 
 #[polyhal::arch_entry]
 fn main(hartid: usize) {
+    trace!("ch7 main: hartid: {}", hartid);
     if hartid != 0 {
         return;
     }
