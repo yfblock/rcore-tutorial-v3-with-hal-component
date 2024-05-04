@@ -7,8 +7,8 @@ use alloc::{
     vec::Vec,
 };
 use lazy_static::*;
-use log::info;
-use polyhal::addr::{PhysPage, VirtAddr};
+use log::{info, warn};
+use polyhal::addr::VirtAddr;
 use polyhal::TrapFrame;
 
 pub struct RecycleAllocator {
@@ -159,15 +159,6 @@ impl TaskUserRes {
             ustack_top.into(),
             MapPermission::R | MapPermission::W | MapPermission::U,
         );
-        // alloc trap_cx
-        let trap_cx_bottom = trap_cx_bottom_from_tid(self.tid);
-        let trap_cx_top = trap_cx_bottom + PAGE_SIZE;
-        info!("trap cx {:#x} - {:#x}", trap_cx_bottom, trap_cx_top);
-        process_inner.memory_set.insert_framed_area(
-            trap_cx_bottom.into(),
-            trap_cx_top.into(),
-            MapPermission::R | MapPermission::W,
-        );
     }
 
     fn dealloc_user_res(&self) {
@@ -209,15 +200,18 @@ impl TaskUserRes {
     pub fn trap_cx_ppn(&self) -> &'static mut TrapFrame {
         let process = self.process.upgrade().unwrap();
         let process_inner = process.inner_exclusive_access();
-        // let task = process_inner.tasks[self.tid].unwrap().clone();
-        todo!("trap_cx_ppn")
-        // task.inner_exclusive_access().get_trap_cx()
+        let task = process_inner.tasks[self.tid].as_ref().unwrap().clone();
+        // todo!("trap_cx_ppn")
+        warn!("trap_cx_ppn will return trap frame");
+        let tref = task.inner_exclusive_access().get_trap_cx();
         // let trap_cx_bottom_va: VirtAddr = trap_cx_bottom_from_tid(self.tid).into();
         // process_inner
         //     .memory_set
         //     .translate(trap_cx_bottom_va.into())
         //     .unwrap()
         //     .0
+        drop(task);
+        tref
     }
 
     pub fn ustack_base(&self) -> usize {

@@ -50,7 +50,7 @@ impl TaskControlBlock {
         alloc_user_res: bool,
     ) -> Self {
         let res = TaskUserRes::new(Arc::clone(&process), ustack_base, alloc_user_res);
-        let trap_cx = res.trap_cx_ppn();
+        // let trap_cx = res.trap_cx_ppn();
         let kstack = kstack_alloc();
         let kstack_top = kstack.get_top();
         let mut kcontext = KContext::blank();
@@ -62,7 +62,7 @@ impl TaskControlBlock {
             inner: unsafe {
                 UPSafeCell::new(TaskControlBlockInner {
                     res: Some(res),
-                    trap_cx: trap_cx.clone(),
+                    trap_cx: TrapFrame::new(),
                     task_cx: kcontext,
                     task_status: TaskStatus::Ready,
                     exit_code: None,
