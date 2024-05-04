@@ -5,7 +5,7 @@ use alloc::sync::Arc;
 use polyhal::pagetable::PageTable;
 use polyhal::{kernel_page_table, KContext, context_switch_pt};
 use lazy_static::*;
-
+use log::*;
 pub struct Processor {
     current: Option<Arc<TaskControlBlock>>,
     idle_task_cx: KContext,
@@ -34,6 +34,7 @@ lazy_static! {
 }
 
 pub fn run_tasks() {
+    trace!("os::task::processor::run_tasks");
     loop {
         let mut processor = PROCESSOR.exclusive_access();
         if let Some(task) = fetch_task() {

@@ -96,6 +96,7 @@ impl TaskControlBlockInner {
 }
 
 fn task_entry() {
+    trace!("os::task::task_entry");
     let task = current_task()
         .unwrap()
         .inner
@@ -121,6 +122,7 @@ impl TaskControlBlock {
         self.inner.exclusive_access()
     }
     pub fn new(elf_data: &[u8]) -> Self {
+        trace!("os::task::TaskControlBlock::new");
         // memory_set with elf program headers/trampoline/trap context/user stack
         let (memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data);
         // alloc a pid and a kernel stack in kernel space
@@ -164,6 +166,7 @@ impl TaskControlBlock {
         task_control_block
     }
     pub fn exec(&self, elf_data: &[u8], args: Vec<String>) {
+        trace!("os::task::TaskControlBlock::exec");
         // memory_set with elf program headers/trampoline/trap context/user stack
         let (memory_set, mut user_sp, entry_point) = MemorySet::from_elf(elf_data);
         memory_set.activate();
@@ -210,6 +213,7 @@ impl TaskControlBlock {
         // **** release current PCB
     }
     pub fn fork(self: &Arc<TaskControlBlock>) -> Arc<TaskControlBlock> {
+        trace!("os::task::TaskControlBlock::fork");
         // ---- hold parent PCB lock
         let mut parent_inner = self.inner_exclusive_access();
         // copy user space(include trap context)

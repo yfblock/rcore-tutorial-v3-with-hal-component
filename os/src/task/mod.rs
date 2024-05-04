@@ -12,7 +12,7 @@ use polyhal::shutdown;
 use polyhal::KContext;
 use polyhal::TrapFrameArgs;
 use lazy_static::*;
-use log::info;
+use log::*;
 use manager::fetch_task;
 use manager::remove_from_pid2task;
 use task::{TaskControlBlock, TaskStatus};
@@ -24,6 +24,7 @@ pub use processor::{current_task, current_user_token, run_tasks, schedule, take_
 pub use signal::{SignalFlags, MAX_SIG};
 
 pub fn suspend_current_and_run_next() {
+    //trace!("os::task::suspend_current_and_run_next");
     // There must be an application running.
     let task = take_current_task().unwrap();
 
@@ -46,6 +47,7 @@ pub const IDLE_PID: usize = 0;
 
 /// Exit the current 'Running' task and run the next task in task list.
 pub fn exit_current_and_run_next(exit_code: i32) {
+    trace!("os::task::exit_current_and_run_next");
     // take from Processor
     let task = take_current_task().unwrap();
 
@@ -101,10 +103,12 @@ lazy_static! {
 }
 
 pub fn add_initproc() {
+    trace!("os::task::add_initproc");
     add_task(INITPROC.clone());
 }
 
 pub fn check_signals_error_of_current() -> Option<(i32, &'static str)> {
+    trace!("os::task::check_signals_error_of_current");
     let task = current_task().unwrap();
     let task_inner = task.inner_exclusive_access();
     // println!(
@@ -115,6 +119,7 @@ pub fn check_signals_error_of_current() -> Option<(i32, &'static str)> {
 }
 
 pub fn current_add_signal(signal: SignalFlags) {
+    trace!("os::task::current_add_signal");
     let task = current_task().unwrap();
     let mut task_inner = task.inner_exclusive_access();
     task_inner.signals |= signal;
@@ -125,6 +130,7 @@ pub fn current_add_signal(signal: SignalFlags) {
 }
 
 fn call_kernel_signal_handler(signal: SignalFlags) {
+    trace!("os::task::call_kernel_signal_handler");
     let task = current_task().unwrap();
     let mut task_inner = task.inner_exclusive_access();
     match signal {
@@ -149,6 +155,7 @@ fn call_kernel_signal_handler(signal: SignalFlags) {
 }
 
 fn call_user_signal_handler(sig: usize, signal: SignalFlags) {
+    trace!("os::task::call_user_signal_handler");
     let task = current_task().unwrap();
     let mut task_inner = task.inner_exclusive_access();
 
@@ -178,6 +185,7 @@ fn call_user_signal_handler(sig: usize, signal: SignalFlags) {
 }
 
 fn check_pending_signals() {
+    trace!("os::task::check_pending_signals");
     for sig in 0..(MAX_SIG + 1) {
         let task = current_task().unwrap();
         let task_inner = task.inner_exclusive_access();
@@ -217,6 +225,7 @@ fn check_pending_signals() {
 }
 
 pub fn handle_signals() {
+    trace!("os::task::handle_signals");
     loop {
         check_pending_signals();
         let (frozen, killed) = {
