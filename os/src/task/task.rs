@@ -2,6 +2,7 @@ use super::id::TaskUserRes;
 use super::{kstack_alloc, KernelStack, ProcessControlBlock};
 use crate::sync::UPSafeCell;
 use alloc::sync::{Arc, Weak};
+use log::info;
 use polyhal::{KContext, KContextArgs, TrapFrame};
 use core::cell::RefMut;
 
@@ -9,6 +10,7 @@ pub struct TaskControlBlock {
     // immutable
     pub process: Weak<ProcessControlBlock>,
     pub kstack: KernelStack,
+    pub kcontext: KContext,
     // mutable
     inner: UPSafeCell<TaskControlBlockInner>,
 }
@@ -56,6 +58,7 @@ impl TaskControlBlock {
         Self {
             process: Arc::downgrade(&process),
             kstack,
+            kcontext: KContext::blank(), 
             inner: unsafe {
                 UPSafeCell::new(TaskControlBlockInner {
                     res: Some(res),

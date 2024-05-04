@@ -4,6 +4,7 @@ use super::VPNRange;
 use crate::config::PAGE_SIZE;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
+use log::info;
 use polyhal::addr::PhysPage;
 use polyhal::addr::{VirtAddr, VirtPage};
 use polyhal::pagetable::MappingFlags;

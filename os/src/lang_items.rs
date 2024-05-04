@@ -15,9 +15,9 @@ fn panic(info: &PanicInfo) -> ! {
     } else {
         error!("[kernel] Panicked: {}", info.message().unwrap());
     }
-    unsafe {
-        backtrace();
-    }
+    // unsafe {
+    //     backtrace();
+    // }
     polyhal::shutdown();
 }
 

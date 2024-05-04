@@ -10,8 +10,9 @@ use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
+use log::info;
 use polyhal::pagetable::PageTable;
-use polyhal::{TrapFrame, TrapFrameArgs};
+use polyhal::{KContext, KContextArgs, TrapFrame, TrapFrameArgs};
 use core::cell::RefMut;
 
 pub struct ProcessControlBlock {
@@ -111,10 +112,11 @@ impl ProcessControlBlock {
             true,
         ));
         // prepare trap_cx of main thread
-        let task_inner = task.inner_exclusive_access();
+        let mut task_inner = task.inner_exclusive_access();
         let trap_cx = task_inner.get_trap_cx();
         let ustack_top = task_inner.res.as_ref().unwrap().ustack_top();
         let kstack_top = task.kstack.get_top();
+        task_inner.task_cx[KContextArgs::KSP] = kstack_top;
         drop(task_inner);
         // *trap_cx = TrapContext::app_init_context(
         //     entry_point,

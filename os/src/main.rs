@@ -17,30 +17,16 @@ mod config;
 mod drivers;
 mod fs;
 mod lang_items;
+mod logging;
 mod mm;
 mod sync;
 mod syscall;
 mod task;
 
-use core::arch::global_asm;
-
-use polyhal::{addr::PhysPage, get_mem_areas, PageAlloc};
+use log::info;
+use polyhal::{addr::PhysPage, get_mem_areas, PageAlloc, TrapFrame, TrapType};
 
 use crate::mm::init_frame_allocator;
-
-global_asm!(include_str!("entry.asm"));
-
-fn clear_bss() {
-    extern "C" {
-        fn sbss();
-        fn ebss();
-    }
-    unsafe {
-        core::slice::from_raw_parts_mut(sbss as usize as *mut u8, ebss as usize - sbss as usize)
-            .fill(0);
-    }
-}
-
 
 // #[no_mangle]
 // pub fn trap_handler() -> ! {
@@ -98,15 +84,23 @@ fn clear_bss() {
 //     trap_return();
 // }
 
-// #[polyhal::arch_entry]
+
+/// kernel interrupt
+#[polyhal::arch_interrupt]
+fn kernel_interrupt(ctx: &mut TrapFrame, trap_type: TrapType) {
+    log::trace!("trap_type @ {:x?} {:#x?}", trap_type, ctx);
+}
+
+#[polyhal::arch_entry]
 pub fn rust_main() -> ! {
-    clear_bss();
     println!("[kernel] Hello, world!");
     mm::init();
+    logging::init(Some("trace"));
+    println!("init logging");
+    polyhal::init(&PageAllocImpl);
     get_mem_areas().into_iter().for_each(|(start, size)| {
         init_frame_allocator(start, start + size);
     });
-    polyhal::init(&PageAllocImpl);
     // mm::remap_test();
 
     fs::list_apps();
