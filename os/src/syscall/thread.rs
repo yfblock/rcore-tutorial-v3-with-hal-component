@@ -5,6 +5,7 @@ use polyhal::TrapFrameArgs;
 pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
     let task = current_task().unwrap();
     let process = task.process.upgrade().unwrap();
+    let page_table = process.inner_exclusive_access().get_user_token();
     // create a new thread
     let new_task = Arc::new(TaskControlBlock::new(
         Arc::clone(&process),
@@ -14,6 +15,7 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
             .unwrap()
             .ustack_base,
         true,
+        page_table
     ));
     // add new task to scheduler
     add_task(Arc::clone(&new_task));

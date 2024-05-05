@@ -1,3 +1,5 @@
+use core::mem::size_of;
+
 use super::ProcessControlBlock;
 use crate::config::{KERNEL_STACK_SIZE, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT_BASE, USER_STACK_SIZE};
 use crate::mm::MapPermission;
@@ -70,50 +72,66 @@ pub fn kernel_stack_position(kstack_id: usize) -> (usize, usize) {
     (bottom, top)
 }
 
-pub struct KernelStack(pub usize);
-
-pub fn kstack_alloc() -> KernelStack {
-    let kstack_id = KSTACK_ALLOCATOR.exclusive_access().alloc();
-    let (kstack_bottom, kstack_top) = kernel_stack_position(kstack_id);
-    // KERNEL_SPACE.exclusive_access().insert_framed_area(
-    //     kstack_bottom.into(),
-    //     kstack_top.into(),
-    //     MapPermission::R | MapPermission::W,
-    // );
-    todo!("alloc kernel stack");
-    KernelStack(kstack_id)
-}
-
-impl Drop for KernelStack {
-    fn drop(&mut self) {
-        let (kernel_stack_bottom, _) = kernel_stack_position(self.0);
-        let kernel_stack_bottom_va: VirtAddr = kernel_stack_bottom.into();
-        // KERNEL_SPACE
-        //     .exclusive_access()
-        //     .remove_area_with_start_vpn(kernel_stack_bottom_va.into());
-        todo!("drop kernel stack");
-        KSTACK_ALLOCATOR.exclusive_access().dealloc(self.0);
-    }
+// pub struct KernelStack(pub usize);
+pub struct KernelStack {
+    inner: Arc<[u128; KERNEL_STACK_SIZE / size_of::<u128>()]>,
 }
 
 impl KernelStack {
-    #[allow(unused)]
-    pub fn push_on_top<T>(&self, value: T) -> *mut T
-    where
-        T: Sized,
-    {
-        let kernel_stack_top = self.get_top();
-        let ptr_mut = (kernel_stack_top - core::mem::size_of::<T>()) as *mut T;
-        unsafe {
-            *ptr_mut = value;
+    pub fn new() -> Self {
+        Self {
+            inner: Arc::new([0u128; KERNEL_STACK_SIZE / size_of::<u128>()]),
         }
-        ptr_mut
     }
-    pub fn get_top(&self) -> usize {
-        let (_, kernel_stack_top) = kernel_stack_position(self.0);
-        kernel_stack_top
+
+    pub fn get_position(&self) -> (usize, usize) {
+        let bottom = self.inner.as_ptr() as usize;
+        (bottom, bottom + KERNEL_STACK_SIZE)
     }
 }
+
+// pub fn kstack_alloc() -> KernelStack {
+//     let kstack_id = KSTACK_ALLOCATOR.exclusive_access().alloc();
+//     let (kstack_bottom, kstack_top) = kernel_stack_position(kstack_id);
+//     // KERNEL_SPACE.exclusive_access().insert_framed_area(
+//     //     kstack_bottom.into(),
+//     //     kstack_top.into(),
+//     //     MapPermission::R | MapPermission::W,
+//     // );
+//     todo!("alloc kernel stack");
+//     KernelStack(kstack_id)
+// }
+
+// impl Drop for KernelStack {
+//     fn drop(&mut self) {
+//         let (kernel_stack_bottom, _) = kernel_stack_position(self.0);
+//         let kernel_stack_bottom_va: VirtAddr = kernel_stack_bottom.into();
+//         // KERNEL_SPACE
+//         //     .exclusive_access()
+//         //     .remove_area_with_start_vpn(kernel_stack_bottom_va.into());
+//         todo!("drop kernel stack");
+//         KSTACK_ALLOCATOR.exclusive_access().dealloc(self.0);
+//     }
+// }
+
+// impl KernelStack {
+//     #[allow(unused)]
+//     pub fn push_on_top<T>(&self, value: T) -> *mut T
+//     where
+//         T: Sized,
+//     {
+//         let kernel_stack_top = self.get_top();
+//         let ptr_mut = (kernel_stack_top - core::mem::size_of::<T>()) as *mut T;
+//         unsafe {
+//             *ptr_mut = value;
+//         }
+//         ptr_mut
+//     }
+//     pub fn get_top(&self) -> usize {
+//         let (_, kernel_stack_top) = kernel_stack_position(self.0);
+//         kernel_stack_top
+//     }
+// }
 
 pub struct TaskUserRes {
     pub tid: usize,

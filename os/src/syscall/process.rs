@@ -7,8 +7,10 @@ use crate::task::{
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use log::info;
 use polyhal::pagetable::PageTable;
 use polyhal::time::Time;
+use polyhal::TrapFrameArgs;
 
 pub fn sys_exit(exit_code: i32) -> ! {
     exit_current_and_run_next(exit_code);
@@ -38,7 +40,7 @@ pub fn sys_fork() -> isize {
     let trap_cx = task.inner_exclusive_access().get_trap_cx();
     // we do not have to move to next instruction since we have done it before
     // for child process, fork returns 0
-    trap_cx.x[10] = 0;
+    trap_cx[TrapFrameArgs::RET] = 0;
     new_pid as isize
 }
 

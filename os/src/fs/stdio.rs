@@ -1,4 +1,5 @@
-use polyhal::debug::DebugConsole;
+use log::info;
+use polyhal::{addr::VirtAddr, debug::DebugConsole, pagetable::PageTable};
 
 use super::File;
 use crate::task::suspend_current_and_run_next;
@@ -14,7 +15,7 @@ impl File for Stdin {
     fn writable(&self) -> bool {
         false
     }
-    fn read(&self, mut user_buf: &mut [u8]) -> usize {
+    fn read(&self, user_buf: &mut [u8]) -> usize {
         assert_eq!(user_buf.len(), 1);
         // busy loop
         let c: u8;

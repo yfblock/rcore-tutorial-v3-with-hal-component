@@ -10,11 +10,12 @@ use self::id::TaskUserRes;
 use crate::fs::{open_file, OpenFlags};
 use alloc::{sync::Arc, vec::Vec};
 use lazy_static::*;
+use log::info;
 use manager::fetch_task;
-use polyhal::KContext;
+use polyhal::{run_user_task, KContext, TrapFrame};
 use process::ProcessControlBlock;
 
-pub use id::{kstack_alloc, pid_alloc, KernelStack, PidHandle, IDLE_PID};
+pub use id::{pid_alloc, KernelStack, PidHandle, IDLE_PID};
 pub use manager::{add_task, pid2process, remove_from_pid2process, remove_task, wakeup_task};
 pub use processor::{
     current_kstack_top, current_process, current_task,
@@ -48,6 +49,20 @@ pub fn block_current_and_run_next() {
     task_inner.task_status = TaskStatus::Blocked;
     drop(task_inner);
     schedule(task_cx_ptr);
+}
+
+fn task_entry() {
+    log::trace!("os::task::task_entry");
+    let task = current_task()
+        .unwrap()
+        .inner_exclusive_access()
+        .get_trap_cx() as *mut TrapFrame;
+    // run_user_task_forever(unsafe { task.as_mut().unwrap() })
+    let ctx_mut = unsafe { task.as_mut().unwrap() };
+    // info!("ctx_mut: {:#x?}", ctx_mut);
+    loop {
+        run_user_task(ctx_mut);
+    }
 }
 
 /// Exit the current 'Running' task and run the next task in task list.

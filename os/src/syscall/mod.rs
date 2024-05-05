@@ -32,11 +32,13 @@ mod sync;
 mod thread;
 
 use fs::*;
+use log::info;
 use process::*;
 use sync::*;
 use thread::*;
 
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
+    // info!("syscall id: {}", syscall_id);
     match syscall_id {
         SYSCALL_DUP => sys_dup(args[0]),
         SYSCALL_OPEN => sys_open(args[0] as *const u8, args[1] as u32),
