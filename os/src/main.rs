@@ -4,7 +4,6 @@
 //! important ones are:
 //!
 //! - [`trap`]: Handles all cases of switching from userspace to the kernel
-//! - [`task`]: Task management
 //! - [`syscall`]: System call handling and implementation
 //!
 //! The operating system also starts in this module. Kernel code starts
@@ -12,55 +11,106 @@
 //! initialize various pieces of functionality. (See its source code for
 //! details.)
 //!
-//! We then call [`task::run_first_task()`] and for the first time go to
+//! We then call [`batch::run_next_app()`] and for the first time go to
 //! userspace.
 
-#![deny(missing_docs)]
-#![deny(warnings)]
+//#![deny(missing_docs)]
+//#![deny(warnings)]
 #![no_std]
 #![no_main]
 #![feature(panic_info_message)]
+#![feature(alloc_error_handler)]
 
+extern crate polyhal;
+extern crate alloc;
+#[macro_use]
+extern crate bitflags;
 use core::arch::global_asm;
+use buddy_system_allocator::LockedHeap;
+use log::info;
+use polyhal::pagetable::PageTableWrapper;
 
-#[path = "boards/qemu.rs"]
-mod board;
-
+#[global_allocator]            
+static HEAP_ALLOCATOR: LockedHeap = LockedHeap::empty();
+//use log::*;
 #[macro_use]
 mod console;
-mod config;
-mod lang_items;
+#[path = "boards/qemu.rs"]
+mod board;
+pub mod frame_allocater;
+pub mod heap_allocator;
 mod loader;
 mod sbi;
-mod sync;
-pub mod syscall;
-pub mod task;
 mod timer;
-pub mod trap;
-
-global_asm!(include_str!("entry.asm"));
+mod lang_items;
+mod logging;
+mod sync;
+pub mod task;
+pub mod syscall;
+pub mod config;
+use crate::syscall::syscall;
+pub use crate::frame_allocater::*;
+use polyhal::{get_mem_areas, PageAlloc, TrapFrame, TrapFrameArgs, TrapType};
+use polyhal::addr::PhysPage;
+use polyhal::TrapType::*;
+pub use heap_allocator::init_heap;
 global_asm!(include_str!("link_app.S"));
 
-/// clear BSS segment
-fn clear_bss() {
-    extern "C" {
-        fn sbss();
-        fn ebss();
+pub struct PageAllocImpl;
+
+impl PageAlloc for PageAllocImpl {
+    #[inline]
+    fn alloc(&self) -> PhysPage {
+        frame_alloc_persist().expect("can't find memory page")
     }
-    unsafe {
-        core::slice::from_raw_parts_mut(sbss as usize as *mut u8, ebss as usize - sbss as usize)
-            .fill(0);
+
+    #[inline]
+    fn dealloc(&self, ppn: PhysPage) {
+        frame_dealloc(ppn)
+    }
+}
+
+/// kernel interrupt
+#[polyhal::arch_interrupt]
+fn kernel_interrupt(ctx: &mut TrapFrame, trap_type: TrapType) {
+    // println!("trap_type @ {:x?} {:#x?}", trap_type, ctx);
+    match trap_type {
+        UserEnvCall => {
+            // jump to next instruction anyway
+            ctx.syscall_ok();
+            let args = ctx.args();
+            // get system call return value
+            // info!("syscall: {}", ctx[TrapFrameArgs::SYSCALL]);
+
+            let result = syscall(ctx[TrapFrameArgs::SYSCALL], [args[0], args[1], args[2]]);
+            // cx is changed during sys_exec, so we have to call it again
+            ctx[TrapFrameArgs::RET] = result as usize;
+        }
+        StorePageFault(_paddr) | LoadPageFault(_paddr) | InstructionPageFault(_paddr) => {
+            println!("[kernel] PageFault in application, kernel killed it. paddr={:x}",_paddr);
+            run_next_app();
+        }
+        IllegalInstruction(_) => {
+            println!("[kernel] IllegalInstruction in application, kernel killed it.");
+            run_next_app();
+        }
+        Time => {
+            
+        }
+        _ => {
+            panic!("unsuspended trap type: {:?}", trap_type);
+        }
     }
 }
 
 /// the rust entry-point of os
-#[no_mangle]
-pub fn rust_main() -> ! {
-    clear_bss();
+#[polyhal::arch_entry]
+fn main(hartid: usize) {
+    if hartid != 0 {
+        return;
+    }
     println!("[kernel] Hello, world!");
-    trap::init();
     loader::load_apps();
-    trap::enable_timer_interrupt();
     timer::set_next_trigger();
     task::run_first_task();
     panic!("Unreachable in rust_main!");
