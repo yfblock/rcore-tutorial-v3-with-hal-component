@@ -4,11 +4,12 @@
 //! kernel binary, so we only need to copy them to the space allocated for each
 //! app to load them. We also allocate fixed spaces for each task's
 //! [`KernelStack`] and [`UserStack`].
-
 use crate::config::*;
-use crate::trap::TrapContext;
 use core::arch::asm;
-
+use log::info;
+use polyhal::pagetable::{MappingFlags, MappingSize, PageTable, PageTableWrapper};
+pub use crate::frame_allocater::{frame_alloc, frame_alloc_persist, frame_dealloc, FrameTracker};
+use polyhal::addr::*;
 #[repr(align(4096))]
 #[derive(Copy, Clone)]
 struct KernelStack {
@@ -32,13 +33,6 @@ static USER_STACK: [UserStack; MAX_APP_NUM] = [UserStack {
 impl KernelStack {
     fn get_sp(&self) -> usize {
         self.data.as_ptr() as usize + KERNEL_STACK_SIZE
-    }
-    pub fn push_context(&self, trap_cx: TrapContext) -> usize {
-        let trap_cx_ptr = (self.get_sp() - core::mem::size_of::<TrapContext>()) as *mut TrapContext;
-        unsafe {
-            *trap_cx_ptr = trap_cx;
-        }
-        trap_cx_ptr as usize
     }
 }
 
@@ -77,6 +71,14 @@ pub fn load_apps() {
         (base_i..base_i + APP_SIZE_LIMIT)
             .for_each(|addr| unsafe { (addr as *mut u8).write_volatile(0) });
         // load app from data section to memory
+        let page_table = PageTable::current();
+        let Page_Num = APP_SIZE_LIMIT/PAGE_SIZE;
+        for i in 0..Page_Num {
+            page_table.map_page(VirtPage::from_addr(base_i + PAGE_SIZE * i), frame_alloc_persist().expect("can't allocate frame"), MappingFlags::URWX, MappingSize::Page4KB);
+        }
+        page_table.map_page(VirtPage::from_addr(0x1_8000_0000 + i*PAGE_SIZE), frame_alloc_persist().expect("can't allocate frame"), MappingFlags::URWX, MappingSize::Page4KB);
+        println!("[kernel] Loading app_{}", i);
+        info!("app src: {:#x} size: {:#x}", app_start[i], app_start[i + 1] - app_start[i]);
         let src = unsafe {
             core::slice::from_raw_parts(app_start[i] as *const u8, app_start[i + 1] - app_start[i])
         };
@@ -94,10 +96,3 @@ pub fn load_apps() {
     }
 }
 
-/// get app info with entry and sp and save `TrapContext` in kernel stack
-pub fn init_app_cx(app_id: usize) -> usize {
-    KERNEL_STACK[app_id].push_context(TrapContext::app_init_context(
-        get_base_i(app_id),
-        USER_STACK[app_id].get_sp(),
-    ))
-}
