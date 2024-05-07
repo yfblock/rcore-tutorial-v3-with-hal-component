@@ -9,21 +9,21 @@
 //! Be careful when you see `__switch` ASM function in `switch.S`. Control flow around this function
 //! might not be what you expect.
 
-mod context;
-mod switch;
 
 #[allow(clippy::module_inception)]
 mod task;
 
-use crate::config::MAX_APP_NUM;
-use crate::loader::{get_num_app};
+use crate::config::{MAX_APP_NUM,PAGE_SIZE};
+use crate::loader::{get_num_app,get_ksp,get_base_i};
 use crate::polyhal::shutdown;
 use crate::sync::UPSafeCell;
+use alloc::vec::Vec;
 use lazy_static::*;
-use switch::__switch;
 use task::{TaskControlBlock, TaskStatus};
-
-pub use context::TaskContext;
+use polyhal::{
+    read_current_tp, run_user_task, KContext, KContextArgs, TrapFrame, TrapFrameArgs,
+};
+use polyhal::context_switch;
 
 /// The task manager, where all the tasks are managed.
 ///
@@ -44,7 +44,7 @@ pub struct TaskManager {
 /// Inner of Task Manager
 pub struct TaskManagerInner {
     /// task list
-    tasks: [TaskControlBlock; MAX_APP_NUM],
+    tasks: Vec<TaskControlBlock>,
     /// id of current `Running` task
     current_task: usize,
 }
@@ -53,14 +53,19 @@ lazy_static! {
     /// Global variable: TASK_MANAGER
     pub static ref TASK_MANAGER: TaskManager = {
         let num_app = get_num_app();
-        let mut tasks = [TaskControlBlock {
-            task_cx: TaskContext::zero_init(),
-            task_status: TaskStatus::UnInit,
-        }; MAX_APP_NUM];
+        let mut kcx = KContext::blank();
+        let mut tasks = Vec::new();
+        for i in 0..MAX_APP_NUM{
+            tasks.push(TaskControlBlock {
+                task_cx: KContext::blank(),
+                task_status: TaskStatus::UnInit,
+        });}
         for (i, task) in tasks.iter_mut().enumerate() {
-            task.task_cx = TaskContext::goto_restore(init_app_cx(i));
             task.task_status = TaskStatus::Ready;
-        }
+            task.task_cx[KContextArgs::KPC] = task_entry as usize;
+            task.task_cx[KContextArgs::KSP] = get_ksp(i);
+            task.task_cx[KContextArgs::KTP] = read_current_tp();          
+            }
         TaskManager {
             num_app,
             inner: unsafe {
@@ -73,6 +78,7 @@ lazy_static! {
     };
 }
 
+
 impl TaskManager {
     /// Run the first task in task list.
     ///
@@ -82,12 +88,12 @@ impl TaskManager {
         let mut inner = self.inner.exclusive_access();
         let task0 = &mut inner.tasks[0];
         task0.task_status = TaskStatus::Running;
-        let next_task_cx_ptr = &task0.task_cx as *const TaskContext;
+        let next_task_cx_ptr = &task0.task_cx as *const KContext;
         drop(inner);
-        let mut _unused = TaskContext::zero_init();
+        let mut _unused = KContext::blank();
         // before this, we should drop local variables that must be dropped manually
         unsafe {
-            __switch(&mut _unused as *mut TaskContext, next_task_cx_ptr);
+            context_switch(&mut _unused as *mut KContext, next_task_cx_ptr);
         }
         panic!("unreachable in run_first_task!");
     }
@@ -125,23 +131,27 @@ impl TaskManager {
             let current = inner.current_task;
             inner.tasks[next].task_status = TaskStatus::Running;
             inner.current_task = next;
-            let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
-            let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
+            let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut KContext;
+            let next_task_cx_ptr = &inner.tasks[next].task_cx as *const KContext;
             drop(inner);
             // before this, we should drop local variables that must be dropped manually
             unsafe {
-                __switch(current_task_cx_ptr, next_task_cx_ptr);
+                context_switch(current_task_cx_ptr, next_task_cx_ptr);
             }
             // go back to user mode
         } else {
             println!("All applications completed!");
-            shutdown(false);
+            shutdown();
         }
+    }
+    fn current_task(&self)->usize{
+        self.inner.exclusive_access().current_task
     }
 }
 
 /// run first task
 pub fn run_first_task() {
+    println!("123");
     TASK_MANAGER.run_first_task();
 }
 
@@ -153,6 +163,19 @@ fn run_next_task() {
 /// suspend current task
 fn mark_current_suspended() {
     TASK_MANAGER.mark_current_suspended();
+}
+
+
+fn task_entry() {
+    let app_id = TASK_MANAGER.current_task();
+    let mut trap_cx = TrapFrame::new();
+    trap_cx[TrapFrameArgs::SEPC] = get_base_i(app_id);
+    trap_cx[TrapFrameArgs::SP] = 0x1_8000_0000 + (app_id+1)*PAGE_SIZE;
+    let ctx_mut = unsafe { (&mut trap_cx as *mut TrapFrame).as_mut().unwrap() };
+    loop {
+        run_user_task(ctx_mut);
+    }
+    panic!("Unreachable in batch::run_current_app!");
 }
 
 /// exit current task

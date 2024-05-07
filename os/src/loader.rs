@@ -43,8 +43,13 @@ impl UserStack {
 }
 
 /// Get base address of app i.
-fn get_base_i(app_id: usize) -> usize {
+pub fn get_base_i(app_id: usize) -> usize {
     APP_BASE_ADDRESS + app_id * APP_SIZE_LIMIT
+}
+
+pub fn get_ksp(i:usize)->usize{
+    KERNEL_STACK[i].get_sp()
+
 }
 
 /// Get the total number of applications.
@@ -63,20 +68,24 @@ pub fn load_apps() {
     }
     let num_app_ptr = _num_app as usize as *const usize;
     let num_app = get_num_app();
+    info!("num_app={}",num_app);
     let app_start = unsafe { core::slice::from_raw_parts(num_app_ptr.add(1), num_app + 1) };
     // load apps
     for i in 0..num_app {
         let base_i = get_base_i(i);
         // clear region
-        (base_i..base_i + APP_SIZE_LIMIT)
-            .for_each(|addr| unsafe { (addr as *mut u8).write_volatile(0) });
-        // load app from data section to memory
         let page_table = PageTable::current();
         let Page_Num = APP_SIZE_LIMIT/PAGE_SIZE;
+        info!("{:#x}",base_i);
         for i in 0..Page_Num {
             page_table.map_page(VirtPage::from_addr(base_i + PAGE_SIZE * i), frame_alloc_persist().expect("can't allocate frame"), MappingFlags::URWX, MappingSize::Page4KB);
         }
         page_table.map_page(VirtPage::from_addr(0x1_8000_0000 + i*PAGE_SIZE), frame_alloc_persist().expect("can't allocate frame"), MappingFlags::URWX, MappingSize::Page4KB);
+        (base_i..base_i + APP_SIZE_LIMIT)
+            .for_each(|addr| unsafe { (addr as *mut u8).write_volatile(0) });
+        info!("start!");
+        // load app from data section to memory
+
         println!("[kernel] Loading app_{}", i);
         info!("app src: {:#x} size: {:#x}", app_start[i], app_start[i + 1] - app_start[i]);
         let src = unsafe {
@@ -85,10 +94,7 @@ pub fn load_apps() {
         let dst = unsafe { core::slice::from_raw_parts_mut(base_i as *mut u8, src.len()) };
         dst.copy_from_slice(src);
     }
-    // Memory fence about fetching the instruction memory
-    // It is guaranteed that a subsequent instruction fetch must
-    // observes all previous writes to the instruction memory.
-    // Therefore, fence.i must be executed after we have loaded
+    
     // the code of the next app into the instruction memory.
     // See also: riscv non-priv spec chapter 3, 'Zifencei' extension.
     unsafe {

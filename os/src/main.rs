@@ -40,8 +40,6 @@ mod board;
 pub mod frame_allocater;
 pub mod heap_allocator;
 mod loader;
-mod sbi;
-mod timer;
 mod lang_items;
 mod logging;
 mod sync;
@@ -51,6 +49,7 @@ pub mod config;
 use crate::syscall::syscall;
 pub use crate::frame_allocater::*;
 use polyhal::{get_mem_areas, PageAlloc, TrapFrame, TrapFrameArgs, TrapType};
+use task::{suspend_current_and_run_next,exit_current_and_run_next};
 use polyhal::addr::PhysPage;
 use polyhal::TrapType::*;
 pub use heap_allocator::init_heap;
@@ -88,14 +87,14 @@ fn kernel_interrupt(ctx: &mut TrapFrame, trap_type: TrapType) {
         }
         StorePageFault(_paddr) | LoadPageFault(_paddr) | InstructionPageFault(_paddr) => {
             println!("[kernel] PageFault in application, kernel killed it. paddr={:x}",_paddr);
-            run_next_app();
+            exit_current_and_run_next();
         }
         IllegalInstruction(_) => {
             println!("[kernel] IllegalInstruction in application, kernel killed it.");
-            run_next_app();
+            exit_current_and_run_next();
         }
         Time => {
-            
+            suspend_current_and_run_next()
         }
         _ => {
             panic!("unsuspended trap type: {:?}", trap_type);
@@ -110,8 +109,18 @@ fn main(hartid: usize) {
         return;
     }
     println!("[kernel] Hello, world!");
+    init_heap();
+    logging::init(Some("trace"));
+    polyhal::init(&PageAllocImpl);
+    get_mem_areas().into_iter().for_each(|(start, size)| {
+        info!("frame alloocator add frame {:#x} - {:#x}", start, start + size);
+        init_frame_allocator(start, start + size);
+    });
+    let new_page_table = PageTableWrapper::alloc();
+    new_page_table.change();
     loader::load_apps();
-    timer::set_next_trigger();
+    println!("456");
+    //timer::set_next_trigger();
     task::run_first_task();
     panic!("Unreachable in rust_main!");
 }
