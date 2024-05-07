@@ -39,6 +39,7 @@ mod console;
 mod board;
 pub mod frame_allocater;
 pub mod heap_allocator;
+pub mod timer;
 mod loader;
 mod lang_items;
 mod logging;

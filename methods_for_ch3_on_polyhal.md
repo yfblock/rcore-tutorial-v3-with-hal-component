@@ -91,4 +91,23 @@ fn task_entry() {
 
 get_ksp(i)为获取第i个函数的用户堆栈的栈顶地址。
 
-PS.本实验尚未加入时钟处理。
+6.最后，为该实验加入时钟中断处理，利用polyhal中的time模块即可：
+
+```rust
+use crate::config::CLOCK_FREQ;
+use polyhal::time::Time;
+
+const TICKS_PER_SEC: usize = 100;
+const MSEC_PER_SEC: usize = 1000;
+
+/// read the `mtime` register
+pub fn get_time() -> usize {
+        Time::now().to_msec()/MSEC_PER_SEC
+}
+/// get current time in milliseconds
+pub fn get_time_ms() -> usize {
+    Time::now().to_msec() 
+}
+
+```
+
