@@ -32,9 +32,14 @@ jobs:
     - name: Install generaic tools
       run: yes | pacman -Syy make cmake rustup gcc
     - name: setup rust toolchain
-      run: rustup default nightly && cargo install cargo-binutils
+      run: rustup default nightly && cargo install cargo-binutils && cargo install kbuild
+    - name: setup environment
+      run: echo "~/.cargo/bin" >> $GITHUB_PATH
+    - name: patch polyhal
+      run: cd os && kbuild patch polyhal && git checkout ${{ inputs.commit}}
+      if: ${{ github.event_name == 'workflow_dispatch' }}
     - name: Test ${{ matrix.arch }}
-      run: cd os && PATH=$PATH:~/.cargo/bin make ARCH=${{ matrix.arch }} build
+      run: cd os && make ARCH=${{ matrix.arch }} build
     # - name: Install Qemu
     #   run: yes | pacman -Syy ${{ matrix.packages }}
     # - name: Test run
