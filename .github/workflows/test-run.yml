@@ -37,7 +37,7 @@ jobs:
       # run: echo "~/.cargo/bin" >> $GITHUB_PATH
       run: export PATH=$PATH:"~/.cargo/bin"
     - name: patch polyhal
-      run: cd os && ~/.cargo/bin/kbuild patch polyhal && git checkout ${{ inputs.commit}}
+      run: cd os && ~/.cargo/bin/kbuild patch polyhal && cd crates/polyhal && git checkout ${{ inputs.commit}}
       if: ${{ github.event_name == 'workflow_dispatch' }}
     - name: Test ${{ matrix.arch }}
       run: cd os && PATH=$PATH:~/.cargo/bin make ARCH=${{ matrix.arch }} build
