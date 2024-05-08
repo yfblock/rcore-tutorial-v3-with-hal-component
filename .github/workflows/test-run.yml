@@ -37,10 +37,10 @@ jobs:
       # run: echo "~/.cargo/bin" >> $GITHUB_PATH
       run: export PATH=$PATH:"~/.cargo/bin"
     - name: patch polyhal
-      run: cd os && kbuild patch polyhal && git checkout ${{ inputs.commit}}
+      run: cd os && ~/.cargo/bin/kbuild patch polyhal && git checkout ${{ inputs.commit}}
       if: ${{ github.event_name == 'workflow_dispatch' }}
     - name: Test ${{ matrix.arch }}
-      run: cd os && make ARCH=${{ matrix.arch }} build
+      run: cd os && PATH=$PATH:~/.cargo/bin make ARCH=${{ matrix.arch }} build
     # - name: Install Qemu
     #   run: yes | pacman -Syy ${{ matrix.packages }}
     # - name: Test run
