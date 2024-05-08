@@ -34,7 +34,8 @@ jobs:
     - name: setup rust toolchain
       run: rustup default nightly && cargo install cargo-binutils && cargo install kbuild
     - name: setup environment
-      run: echo "~/.cargo/bin" >> $GITHUB_PATH
+      # run: echo "~/.cargo/bin" >> $GITHUB_PATH
+      run: export PATH=$PATH:"~/.cargo/bin"
     - name: patch polyhal
       run: cd os && kbuild patch polyhal && git checkout ${{ inputs.commit}}
       if: ${{ github.event_name == 'workflow_dispatch' }}
