@@ -42,7 +42,7 @@ SECTIONS
 
     .bss ALIGN(4K): {
         *(.bss.stack)
-        sbss = .;
+        _sbss = .;
         *(.bss .bss.*)
         *(.sbss .sbss.*)
         _ebss = .;

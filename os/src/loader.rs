@@ -60,6 +60,27 @@ pub fn get_num_app() -> usize {
     unsafe { (_num_app as usize as *const usize).read_volatile() }
 }
 
+#[cfg(target_arch = "x86_64")]
+unsafe fn execute_fence() {
+    asm!("mfence");
+}
+
+#[cfg(target_arch = "riscv64")]
+unsafe fn execute_fence() {
+    asm!("fence.i");
+}
+
+#[cfg(target_arch = "aarch64")]
+unsafe fn execute_fence() {
+    asm!("dmb ish");
+}
+
+#[cfg(target_arch = "loongarch64")]
+unsafe fn execute_fence() {
+    //asm!("fence");
+    //TODO
+}
+
 /// Load nth user app at
 /// [APP_BASE_ADDRESS + n * APP_SIZE_LIMIT, APP_BASE_ADDRESS + (n+1) * APP_SIZE_LIMIT).
 pub fn load_apps() {
@@ -98,7 +119,7 @@ pub fn load_apps() {
     // the code of the next app into the instruction memory.
     // See also: riscv non-priv spec chapter 3, 'Zifencei' extension.
     unsafe {
-        asm!("fence.i");
+        execute_fence();
     }
 }
 

@@ -17,6 +17,7 @@ use crate::config::{MAX_APP_NUM,PAGE_SIZE};
 use crate::loader::{get_num_app,get_ksp,get_base_i};
 use crate::polyhal::shutdown;
 use crate::sync::UPSafeCell;
+use log::info;
 use alloc::vec::Vec;
 use lazy_static::*;
 use task::{TaskControlBlock, TaskStatus};
@@ -92,6 +93,7 @@ impl TaskManager {
         drop(inner);
         let mut _unused = KContext::blank();
         // before this, we should drop local variables that must be dropped manually
+        info!("context_switch before!");
         unsafe {
             context_switch(&mut _unused as *mut KContext, next_task_cx_ptr);
         }

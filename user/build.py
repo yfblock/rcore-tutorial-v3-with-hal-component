@@ -3,6 +3,7 @@ import os
 base_address = 0x80400000
 step = 0x20000
 linker = 'src/linker.ld'
+target = os.environ.get("TARGET")
 
 app_id = 0
 apps = os.listdir('src/bin')
@@ -18,7 +19,9 @@ for app in apps:
             lines.append(line)
     with open(linker, 'w+') as f:
         f.writelines(lines)
-    os.system('cargo build --bin %s --release' % app)
+    command = f'cargo build -Z build-std=alloc,core --bin {app} --release --target {target}'
+    print(command)
+    os.system(command)
     print('[build.py] application %s start with address %s' %(app, hex(base_address+step*app_id)))
     with open(linker, 'w+') as f:
         f.writelines(lines_before)
