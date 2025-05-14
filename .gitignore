@@ -9,9 +9,6 @@
 
 os/src/link_app.S
 os/src/linker.ld
-os/*.log
-os/virt.out
-os/fs-img.img
 os/last-*
 os/Cargo.lock
 os/.gdb_history
@@ -25,3 +22,6 @@ easy-fs-fuse/Cargo.lock
 easy-fs-fuse/target/*
 tools/
 pushall.sh
+*.log
+fs-img.img
+virt.out

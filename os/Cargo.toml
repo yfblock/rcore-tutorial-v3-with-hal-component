@@ -23,6 +23,3 @@ fdt = "0.1.5"
 
 [profile.release]
 debug = true
-
-[workspace]
-members = ["."]
