@@ -1,12 +1,12 @@
-use super::vpn_range::VPNRange;
+use super::vpn_range::VAddrRange;
 use super::{frame_alloc, FrameTracker};
 use crate::config::{PAGE_SIZE, USER_STACK_SIZE};
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use polyhal::pagetable::{MappingFlags, MappingSize, PageTable, PageTableWrapper};
-use polyhal::addr::{PhysPage, VirtAddr, VirtPage};
 use log::*;
+use polyhal::pagetable::{MappingFlags, MappingSize, PageTable, PageTableWrapper};
+use polyhal::{PhysAddr, VirtAddr};
 pub struct MemorySet {
     page_table: Arc<PageTableWrapper>,
     areas: Vec<MapArea>,
@@ -40,7 +40,7 @@ impl MemorySet {
         let magic = elf_header.pt1.magic;
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
         let ph_count = elf_header.pt2.ph_count();
-        let mut max_end_vpn = VirtPage::new(0);
+        let mut max_end_va = VirtAddr::new(0);
         for i in 0..ph_count {
             let ph = elf.program_header(i).unwrap();
             if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
@@ -58,7 +58,7 @@ impl MemorySet {
                     map_perm |= MapPermission::X;
                 }
                 let map_area = MapArea::new(start_va, end_va, MapType::Framed, map_perm);
-                max_end_vpn = map_area.vpn_range.get_end();
+                max_end_va = map_area.vaddr_range.get_end();
                 memory_set.push(
                     map_area,
                     Some(&elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize]),
@@ -66,7 +66,6 @@ impl MemorySet {
             }
         }
         // map user stack with U flags
-        let max_end_va: VirtAddr = max_end_vpn.into();
         let mut user_stack_bottom: usize = max_end_va.into();
         // guard page
         user_stack_bottom += PAGE_SIZE;
@@ -95,10 +94,17 @@ impl MemorySet {
             let new_area = MapArea::from_another(area);
             memory_set.push(new_area, None);
             // copy data from another space
-            for vpn in area.vpn_range {
-                let src_ppn = user_space.translate(vpn).unwrap().0;
-                let dst_ppn = memory_set.translate(vpn).unwrap().0;
-                dst_ppn.get_buffer().copy_from_slice(src_ppn.get_buffer())
+            for vpn in area.vaddr_range {
+                let src = user_space.translate(vpn).unwrap().0;
+                let dst = memory_set.translate(vpn).unwrap().0;
+                // dst_ppn.get_buffer().copy_from_slice(src_ppn.get_buffer())
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        src.get_ptr::<u8>(),
+                        dst.get_mut_ptr(),
+                        PAGE_SIZE,
+                    );
+                }
             }
         }
         memory_set
@@ -106,20 +112,20 @@ impl MemorySet {
     pub fn activate(&self) {
         self.page_table.change();
     }
-    pub fn translate(&self, vpn: VirtPage) -> Option<(PhysPage, MappingFlags)> {
+    pub fn translate(&self, vaddr: VirtAddr) -> Option<(PhysAddr, MappingFlags)> {
         self.page_table
-            .translate(vpn.into())
+            .translate(vaddr)
             .map(|(pa, flags)| (pa.into(), flags))
     }
     pub fn recycle_data_pages(&mut self) {
-        //*self = Self::new_bare(); 
+        //*self = Self::new_bare();
         self.areas.clear();
     }
 }
 
 pub struct MapArea {
-    pub vpn_range: VPNRange,
-    data_frames: BTreeMap<VirtPage, FrameTracker>,
+    pub vaddr_range: VAddrRange,
+    data_frames: BTreeMap<VirtAddr, FrameTracker>,
     map_type: MapType,
     map_perm: MapPermission,
 }
@@ -131,10 +137,10 @@ impl MapArea {
         map_type: MapType,
         map_perm: MapPermission,
     ) -> Self {
-        let start_vpn: VirtPage = start_va.floor().into();
-        let end_vpn: VirtPage = end_va.ceil().into();
+        let start_vpn: VirtAddr = start_va.floor();
+        let end_vpn: VirtAddr = end_va.ceil();
         Self {
-            vpn_range: VPNRange::new(start_vpn, end_vpn),
+            vaddr_range: VAddrRange::new(start_vpn, end_vpn),
             data_frames: BTreeMap::new(),
             map_type,
             map_perm,
@@ -142,7 +148,10 @@ impl MapArea {
     }
     pub fn from_another(another: &MapArea) -> Self {
         Self {
-            vpn_range: VPNRange::new(another.vpn_range.get_start(), another.vpn_range.get_end()),
+            vaddr_range: VAddrRange::new(
+                another.vaddr_range.get_start(),
+                another.vaddr_range.get_end(),
+            ),
             data_frames: BTreeMap::new(),
             map_type: another.map_type,
             map_perm: another.map_perm,
@@ -150,11 +159,16 @@ impl MapArea {
     }
     pub fn map(&mut self, page_table: &Arc<PageTableWrapper>) {
         trace!("os::mm::memory_set::MapArea::map");
-        for vpn in self.vpn_range {
+        for vaddr in self.vaddr_range {
             // self.map_one(page_table, vpn);
             let p_tracker = frame_alloc().expect("can't allocate frame");
-            page_table.map_page(vpn, p_tracker.ppn, self.map_perm.into(), MappingSize::Page4KB);
-            self.data_frames.insert(vpn, p_tracker);
+            page_table.map_page(
+                vaddr,
+                p_tracker.paddr,
+                self.map_perm.into(),
+                MappingSize::Page4KB,
+            );
+            self.data_frames.insert(vaddr, p_tracker);
         }
     }
 
@@ -162,7 +176,7 @@ impl MapArea {
     #[allow(unused)]
     pub fn unmap(&mut self, page_table: &Arc<PageTableWrapper>) {
         trace!("os::mm::memory_set::MapArea::unmap");
-        for vpn in self.vpn_range {
+        for vpn in self.vaddr_range {
             page_table.unmap_page(vpn);
         }
     }
@@ -173,26 +187,29 @@ impl MapArea {
         trace!("os::mm::memory_set::MapArea::copy_data");
         assert_eq!(self.map_type, MapType::Framed);
         let mut start: usize = 0;
-        let mut current_vpn = self.vpn_range.get_start();
+        let mut curr_vaddr = self.vaddr_range.get_start();
         let len = data.len();
         loop {
             let src = &data[start..len.min(start + PAGE_SIZE)];
-            let dst = &mut PhysPage::from(page_table.translate(current_vpn.into()).unwrap().0)
-                .get_buffer()[..src.len()];
+            let dst = &mut page_table
+                .translate(curr_vaddr.into())
+                .unwrap()
+                .0
+                .slice_mut_with_len(src.len());
             dst.copy_from_slice(src);
             start += PAGE_SIZE;
             if start >= len {
                 break;
             }
             // current_vpn.step();
-            current_vpn = current_vpn + 1;
+            curr_vaddr = curr_vaddr + PAGE_SIZE;
         }
     }
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum MapType {
-//  Identical, not used now
+    //  Identical, not used now
     Framed,
 }
 

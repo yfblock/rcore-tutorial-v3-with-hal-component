@@ -8,19 +8,21 @@ mod task;
 
 use crate::fs::{open_file, OpenFlags};
 use alloc::sync::Arc;
-use polyhal::shutdown;
-use polyhal::KContext;
-use polyhal::TrapFrameArgs;
 use lazy_static::*;
 use log::*;
 use manager::fetch_task;
 use manager::remove_from_pid2task;
+use polyhal::instruction::shutdown;
+use polyhal::kcontext::KContext;
+use polyhal_trap::trapframe::TrapFrameArgs;
 use task::{TaskControlBlock, TaskStatus};
 
 pub use action::{SignalAction, SignalActions};
 pub use manager::{add_task, pid2task};
 pub use pid::{pid_alloc, PidHandle};
-pub use processor::{current_task, current_user_token, run_tasks, schedule, take_current_task};
+pub use processor::{
+    current_task, current_user_token, init_kernel_page, run_tasks, schedule, take_current_task,
+};
 pub use signal::{SignalFlags, MAX_SIG};
 
 pub fn suspend_current_and_run_next() {

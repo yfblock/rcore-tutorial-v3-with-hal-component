@@ -1,7 +1,7 @@
 OUTPUT_ARCH(riscv)
 ENTRY(_start)
 
-BASE_ADDRESS = 0x9000000090000000;
+BASE_ADDRESS = 0x9000000080000000;
 
 SECTIONS
 {
@@ -62,7 +62,7 @@ SECTIONS
     . = _percpu_start + SIZEOF(.percpu);
     _percpu_end = .;
 
-    PROVIDE(end = .);
+    PROVIDE(_end = .);
     /DISCARD/ : {
         *(.comment) *(.gnu*) *(.note*) *(.eh_frame*)
     }

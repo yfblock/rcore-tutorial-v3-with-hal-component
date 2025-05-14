@@ -1,11 +1,14 @@
+use core::cell::LazyCell;
+
 use super::TaskControlBlock;
 use super::{fetch_task, TaskStatus};
 use crate::sync::UPSafeCell;
 use alloc::sync::Arc;
-use polyhal::pagetable::PageTable;
-use polyhal::{kernel_page_table, KContext, context_switch_pt};
 use lazy_static::*;
+use lazyinit::LazyInit;
 use log::*;
+use polyhal::kcontext::{context_switch_pt, KContext};
+use polyhal::pagetable::PageTable;
 pub struct Processor {
     current: Option<Arc<TaskControlBlock>>,
     idle_task_cx: KContext,
@@ -70,12 +73,19 @@ pub fn current_user_token() -> PageTable {
     token
 }
 
+static BOOT_PAGE_TABLE: LazyInit<PageTable> = LazyInit::new();
+
 pub fn schedule(switched_task_cx_ptr: *mut KContext) {
     let mut processor = PROCESSOR.exclusive_access();
     let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
     drop(processor);
     // from switched task, switch to idle task with kernel page table
+    // todo!("switch PageTable");
     unsafe {
-        context_switch_pt(switched_task_cx_ptr, idle_task_cx_ptr, kernel_page_table());
+        context_switch_pt(switched_task_cx_ptr, idle_task_cx_ptr, *BOOT_PAGE_TABLE);
     }
+}
+
+pub fn init_kernel_page() {
+    BOOT_PAGE_TABLE.init_once(PageTable::current());
 }

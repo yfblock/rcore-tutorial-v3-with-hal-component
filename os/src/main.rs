@@ -1,6 +1,5 @@
 #![no_std]
 #![no_main]
-#![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 
 use crate::{
@@ -10,11 +9,14 @@ use crate::{
         handle_signals, suspend_current_and_run_next, SignalFlags,
     },
 };
-use polyhal::{get_mem_areas, PageAlloc, TrapFrame, TrapFrameArgs, TrapType};
 // use polyhal::api::ArchInterface;
-use polyhal::addr::PhysPage;
 use log::*;
-use polyhal::TrapType::*;
+use polyhal::{common::PageAlloc, irq::IRQ, mem::get_mem_areas, PhysAddr};
+use polyhal_boot::define_entry;
+use polyhal_trap::{
+    trap::TrapType::{self, *},
+    trapframe::{TrapFrame, TrapFrameArgs},
+};
 extern crate alloc;
 
 #[macro_use]
@@ -40,7 +42,7 @@ fn kernel_interrupt(ctx: &mut TrapFrame, trap_type: TrapType) {
     // trace!("trap_type @ {:x?} {:#x?}", trap_type, ctx);
     match trap_type {
         Breakpoint => return,
-        UserEnvCall => {
+        SysCall => {
             // jump to next instruction anyway
             ctx.syscall_ok();
             let args = ctx.args();
@@ -65,7 +67,7 @@ fn kernel_interrupt(ctx: &mut TrapFrame, trap_type: TrapType) {
         IllegalInstruction(_) => {
             current_add_signal(SignalFlags::SIGILL);
         }
-        Time => {
+        Timer => {
             suspend_current_and_run_next();
         }
         _ => {
@@ -83,7 +85,6 @@ fn kernel_interrupt(ctx: &mut TrapFrame, trap_type: TrapType) {
     }
 }
 
-#[polyhal::arch_entry]
 fn main(hartid: usize) {
     trace!("ch7 main: hartid: {}", hartid);
     if hartid != 0 {
@@ -95,28 +96,31 @@ fn main(hartid: usize) {
     println!("init logging");
     // polyhal::init_interrupt(); done in polyhal::CPU::rust_main()
 
-    polyhal::init(&PageAllocImpl);
-    get_mem_areas().into_iter().for_each(|(start, size)| {
+    polyhal::common::init(&PageAllocImpl);
+    get_mem_areas().for_each(|(start, size)| {
         println!("init memory region {:#x} - {:#x}", start, start + size);
-        mm::init_frame_allocator(start, start + size);
+        mm::add_frames_range(*start, start + size);
     });
 
     fs::list_apps();
+    task::init_kernel_page();
     task::add_initproc();
     task::run_tasks();
     panic!("Unreachable in main function of rCore Tutorial kernel!");
 }
 
+define_entry!(main);
+
 pub struct PageAllocImpl;
 
 impl PageAlloc for PageAllocImpl {
     #[inline]
-    fn alloc(&self) -> PhysPage {
+    fn alloc(&self) -> PhysAddr {
         mm::frame_alloc_persist().expect("can't find memory page")
     }
 
     #[inline]
-    fn dealloc(&self, ppn: PhysPage) {
-        mm::frame_dealloc(ppn)
+    fn dealloc(&self, paddr: PhysAddr) {
+        mm::frame_dealloc(paddr)
     }
 }

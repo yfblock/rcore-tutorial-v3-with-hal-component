@@ -1,6 +1,6 @@
-use polyhal::shutdown;
 use core::panic::PanicInfo;
 use log::*;
+use polyhal::instruction::shutdown;
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -9,10 +9,10 @@ fn panic(info: &PanicInfo) -> ! {
             "[kernel] Panicked at {}:{} {}",
             location.file(),
             location.line(),
-            info.message().unwrap()
+            info.message()
         );
     } else {
-        error!("[kernel] Panicked: {}", info.message().unwrap());
+        error!("[kernel] Panicked: {}", info.message());
     }
     shutdown()
 }

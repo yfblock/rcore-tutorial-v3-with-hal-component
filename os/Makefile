@@ -22,7 +22,7 @@ else ifeq ($(ARCH), aarch64)
 				-kernel $(KERNEL_BIN)
 else ifeq ($(ARCH), loongarch64)
   TARGET := loongarch64-unknown-none
-  QEMU_EXEC += qemu-system-$(ARCH) -kernel $(KERNEL_ELF)
+  QEMU_EXEC += qemu-system-$(ARCH) -kernel $(KERNEL_ELF) -m 1G
   BUS := pci
 else
   $(error "ARCH" must be one of "x86_64", "riscv64", "aarch64" or "loongarch64")
@@ -80,7 +80,7 @@ $(APPS):
 
 kernel:
 	@echo Platform: $(BOARD)
-	@cargo build -Z build-std --release --target $(TARGET)
+	@cargo build --release --target $(TARGET)
 
 clean:
 	@cargo clean

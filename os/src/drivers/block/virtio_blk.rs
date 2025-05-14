@@ -1,23 +1,24 @@
 use core::ptr::NonNull;
 
 use super::BlockDevice;
-use crate::mm::{frame_alloc, frame_dealloc, FrameTracker};
+use crate::mm::{frame_alloc, frame_dealloc, frames_alloc, FrameTracker};
 use crate::sync::UPSafeCell;
 use alloc::vec::Vec;
-use polyhal::addr::{PhysAddr, PhysPage};
-use polyhal::VIRT_ADDR_START;
 use lazy_static::*;
 use log::debug;
+use polyhal::consts::VIRT_ADDR_START;
+use polyhal::pagetable::PAGE_SIZE;
+use polyhal::PhysAddr;
 use virtio_drivers::device::blk::VirtIOBlk;
 use virtio_drivers::transport::mmio::{MmioTransport, VirtIOHeader};
 use virtio_drivers::{BufferDirection, Hal};
 
 #[allow(unused)]
 #[cfg(target_arch = "riscv64")]
-const VIRTIO0: usize = 0x10001000;
+const VIRTIO0: PhysAddr = polyhal::pa!(0x10001000);
 
 #[cfg(target_arch = "aarch64")]
-const VIRTIO0: usize = 0xa00_0000;
+const VIRTIO0: PhysAddr = polyhal::pa!(0xa00_0000);
 
 pub struct VirtIOBlock(UPSafeCell<VirtIOBlk<VirtioHal, MmioTransport>>);
 
@@ -49,10 +50,8 @@ impl VirtIOBlock {
         unsafe {
             Self(UPSafeCell::new(
                 VirtIOBlk::<VirtioHal, MmioTransport>::new(
-                    MmioTransport::new(NonNull::new_unchecked(
-                        (VIRTIO0 | VIRT_ADDR_START) as *mut VirtIOHeader,
-                    ))
-                    .expect("this is not a valid virtio device"),
+                    MmioTransport::new(NonNull::new_unchecked(VIRTIO0.get_mut_ptr()))
+                        .expect("this is not a valid virtio device"),
                 )
                 .unwrap(),
             ))
@@ -62,75 +61,33 @@ impl VirtIOBlock {
 
 pub struct VirtioHal;
 
-// unsafe impl Hal for VirtioHal {
-//     fn dma_alloc(pages: usize, direction: BufferDirection) -> usize {
-//         let mut ppn_base = PhysPage::new(0);
-//         for i in 0..pages {
-//             let frame = frame_alloc().unwrap();
-//             debug!("alloc paddr: {:?}", frame);
-//             if i == 0 {
-//                 ppn_base = frame.ppn;
-//             }
-//             assert_eq!(frame.ppn.as_num(), ppn_base.as_num() + i);
-//             QUEUE_FRAMES.exclusive_access().push(frame);
-//         }
-//         let pa: PhysAddr = ppn_base.into();
-//         pa.addr()
-//     }
-
-//     fn dma_dealloc(pa: usize, pages: usize) -> i32 {
-//         debug!("dealloc paddr: {:?}", pa);
-//         let pa = PhysAddr::new(pa);
-//         let mut ppn_base: PhysPage = pa.into();
-//         for _ in 0..pages {
-//             frame_dealloc(ppn_base);
-//             ppn_base = ppn_base + 1;
-//         }
-//         0
-//     }
-
-//     unsafe fn mmio_phys_to_virt(paddr: virtio_drivers::PhysAddr, size: usize) -> core::ptr::NonNull<u8> {
-
-//     }
-
-//     unsafe fn share(buffer: core::ptr::NonNull<[u8]>, direction: virtio_drivers::BufferDirection) -> virtio_drivers::PhysAddr {
-//         todo!()
-//     }
-
-//     unsafe fn unshare(paddr: virtio_drivers::PhysAddr, buffer: core::ptr::NonNull<[u8]>, direction: virtio_drivers::BufferDirection) {
-//         todo!()
-//     }
-// }
-
 unsafe impl Hal for VirtioHal {
     fn dma_alloc(pages: usize, _direction: BufferDirection) -> (usize, NonNull<u8>) {
-        let mut ppn_base = PhysPage::new(0);
-        for i in 0..pages {
-            let frame = frame_alloc().unwrap();
-            debug!("alloc paddr: {:?}", frame);
-            if i == 0 {
-                ppn_base = frame.ppn
-            };
-            assert_eq!(frame.ppn.as_num(), ppn_base.as_num() + i);
-            QUEUE_FRAMES.exclusive_access().push(frame);
-        }
-        let pa: usize = ppn_base.to_addr();
-        unsafe {
-            (
-                pa,
-                NonNull::new_unchecked((pa | VIRT_ADDR_START) as *mut u8),
-            )
-        }
+        // let mut ppn_base = PhysPage::new(0);
+        // let mut paddr = PhysAddr::new(0);
+        // for i in 0..pages {
+        //     let frame = frame_alloc().unwrap();
+        //     debug!("alloc paddr: {:?}", frame);
+        //     if i == 0 {
+        //         paddr = frame.paddr;
+        //     };
+        //     assert_eq!(frame.paddr.raw(), paddr.raw() + PAGE_SIZE);
+        //     QUEUE_FRAMES.exclusive_access().push(frame);
+        // }
+        // unsafe { (paddr.raw(), NonNull::new_unchecked(paddr.get_mut_ptr())) }
+        let frames = frames_alloc(pages).unwrap();
+        let paddr = frames[0].paddr;
+        QUEUE_FRAMES.exclusive_access().extend(frames);
+        unsafe { (paddr.raw(), NonNull::new_unchecked(paddr.get_mut_ptr())) }
     }
 
     unsafe fn dma_dealloc(paddr: usize, _vaddr: NonNull<u8>, pages: usize) -> i32 {
         // trace!("dealloc DMA: paddr={:#x}, pages={}", paddr, pages);
         log::error!("dealloc paddr: {:?}", paddr);
-        let pa = PhysAddr::new(paddr);
-        let mut ppn_base: PhysPage = pa.into();
+        let mut pa = PhysAddr::new(paddr);
         for _ in 0..pages {
-            frame_dealloc(ppn_base);
-            ppn_base = ppn_base + 1;
+            frame_dealloc(pa);
+            pa = pa + PAGE_SIZE;
         }
         0
     }

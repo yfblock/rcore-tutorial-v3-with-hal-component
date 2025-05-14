@@ -8,12 +8,12 @@ use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
-use polyhal::pagetable::PageTable;
-use polyhal::{
-    read_current_tp, run_user_task, KContext, KContextArgs, TrapFrame, TrapFrameArgs,
-};
 use core::cell::RefMut;
 use core::mem::size_of;
+use polyhal::kcontext::{read_current_tp, KContext, KContextArgs};
+use polyhal::pagetable::PageTable;
+use polyhal_trap::trap::run_user_task;
+use polyhal_trap::trapframe::{TrapFrame, TrapFrameArgs};
 
 pub struct TaskControlBlock {
     // immutable

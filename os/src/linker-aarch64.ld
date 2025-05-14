@@ -62,7 +62,7 @@ SECTIONS
     . = _percpu_start + SIZEOF(.percpu);
     _percpu_end = .;
 
-    PROVIDE(end = .);
+    PROVIDE(_end = .);
     /DISCARD/ : {
         *(.comment) *(.gnu*) *(.note*) *(.eh_frame*)
     }
